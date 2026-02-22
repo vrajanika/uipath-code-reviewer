@@ -65,6 +65,8 @@ AZURE_OPENAI_API_VERSION=2024-02-15-preview
 GITHUB_TOKEN=your-github-token-here
 ```
 
+**📚 For detailed instructions on creating a GitHub token with the correct permissions, see [docs/TOKEN_SETUP.md](docs/TOKEN_SETUP.md)**
+
 ### 4. Set Up GitHub Secrets
 
 For GitHub Actions to work, configure the following secrets in your repository:
@@ -191,8 +193,19 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 **Issue: "Missing required environment variables"**
 - Solution: Make sure all required environment variables are set in your `.env` file or GitHub Secrets
 
-**Issue: "Failed to post review comment"**
-- Solution: The bot uses issue comments by default for better compatibility. Check that your GitHub token has `pull-requests: write` and `issues: write` permissions. See [CONFIGURATION.md](docs/CONFIGURATION.md) for details on handling 403 errors.
+**Issue: "Failed to post review comment"** or **"403 Forbidden"** or **"Resource not accessible"**
+- **Solution:** This is a token permission issue. The bot uses issue comments by default for better compatibility.
+  1. **For local testing:** Your GitHub token needs `repo` scope (or `public_repo` for public repos). See [docs/TOKEN_SETUP.md](docs/TOKEN_SETUP.md) for step-by-step token creation.
+  2. **For GitHub Actions:** Ensure your workflow has the correct permissions (already set in the default workflow):
+     ```yaml
+     permissions:
+       contents: read
+       pull-requests: write
+       issues: write
+     ```
+  3. **Repository settings:** Check Settings → Actions → General → Workflow permissions is set to "Read and write permissions"
+  
+  📚 **Full troubleshooting guide:** [docs/TOKEN_SETUP.md#troubleshooting](docs/TOKEN_SETUP.md#troubleshooting)
 
 **Issue: "Error during code review: Rate limit exceeded"**
 - Solution: Azure OpenAI has rate limits. Consider adding retry logic or reducing the frequency of reviews

@@ -35,7 +35,8 @@ GITHUB_TOKEN=your-github-token-here
 - Azure OpenAI Endpoint: Azure Portal → Your OpenAI Resource → Keys and Endpoint
 - API Key: Same location as endpoint
 - Deployment Name: Azure Portal → Your OpenAI Resource → Model deployments
-- GitHub Token: GitHub Settings → Developer settings → Personal access tokens
+- **GitHub Token**: See [docs/TOKEN_SETUP.md](docs/TOKEN_SETUP.md) for detailed instructions on creating a token with the correct permissions
+  - Quick: GitHub Settings → Developer settings → Personal access tokens → Generate with `repo` scope
 
 ## Step 3: Test Locally (1 minute)
 

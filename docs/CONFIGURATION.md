@@ -33,13 +33,23 @@ The bot uses API version `2024-02-15-preview` by default. You can change this in
 
 ## GitHub Setup
 
+**📚 For detailed token setup instructions, see [TOKEN_SETUP.md](TOKEN_SETUP.md)**
+
 ### Option 1: Personal Access Token (Simpler)
 
+**Quick Steps:**
 1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
 2. Generate a new token with these scopes:
-   - `repo` (Full control of private repositories)
-   - `workflow` (Update GitHub Action workflows)
+   - `repo` (Full control of private repositories) - **Required for private repos**
+   - OR `public_repo` (Access public repositories) - **For public repos only**
 3. Copy the token (you won't see it again!)
+
+**Required Permissions:**
+- ✅ Read repository contents
+- ✅ Write to pull requests
+- ✅ Write to issues
+
+**See [TOKEN_SETUP.md](TOKEN_SETUP.md) for detailed step-by-step instructions with troubleshooting.**
 
 ### Option 2: GitHub App (More Secure)
 
@@ -196,10 +206,31 @@ response = self.client.chat.completions.create(
 ### Issue: Bot doesn't comment on PRs
 
 **Solution:**
-- Check GitHub token permissions
+- Check GitHub token permissions - see [TOKEN_SETUP.md](TOKEN_SETUP.md) for detailed guidance
 - Verify the workflow is enabled
 - Check workflow run logs in GitHub Actions
 - Ensure secrets are set correctly
+
+### Issue: GitHub Token Permission Issues
+
+**Symptoms:**
+- "GitHub access token is required"
+- "404 Not Found" 
+- "403 Forbidden"
+- "Resource not accessible by integration"
+- "Bad credentials"
+
+**Solution:**
+📚 **See [TOKEN_SETUP.md](TOKEN_SETUP.md) for comprehensive token troubleshooting**, including:
+- How to create a token with correct permissions
+- How to verify token scopes
+- Repository settings that may block the bot
+- Differences between local and GitHub Actions tokens
+
+**Quick fixes:**
+1. **For local testing:** Ensure your token has `repo` scope (Settings → Developer settings → Personal access tokens)
+2. **For GitHub Actions:** Verify workflow permissions are set (already configured in default workflow)
+3. **Repository settings:** Check Settings → Actions → General → Workflow permissions
 
 ### Issue: "Resource not accessible by integration" (403 error)
 

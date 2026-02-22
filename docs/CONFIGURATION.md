@@ -201,6 +201,26 @@ response = self.client.chat.completions.create(
 - Check workflow run logs in GitHub Actions
 - Ensure secrets are set correctly
 
+### Issue: "Resource not accessible by integration" (403 error)
+
+**Solution:**
+This error occurs when the GitHub token doesn't have sufficient permissions to post comments. The bot has been updated to handle this gracefully by:
+- Using issue comments (which require fewer permissions) as the primary method
+- Falling back to review comments if needed
+- Working reliably with the default `GITHUB_TOKEN` in GitHub Actions
+
+If you still encounter this error:
+1. Verify the workflow has the correct permissions:
+   ```yaml
+   permissions:
+     contents: read
+     pull-requests: write
+     issues: write
+   ```
+2. Ensure the bot is not being run on a fork PR with restrictive settings
+3. Check that Actions are enabled for the repository
+4. For fork PRs, consider using `pull_request_target` event with caution (security implications)
+
 ## Testing Configuration
 
 ### Local Testing

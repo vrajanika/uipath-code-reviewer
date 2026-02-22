@@ -89,6 +89,9 @@ class GitHubClient:
         """
         Post a review comment on a pull request.
         
+        Uses issue comments by default for better compatibility with GitHub Actions.
+        Falls back to create_review if issue comments fail.
+        
         Args:
             repo_full_name: Full repository name
             pr_number: Pull request number
@@ -99,22 +102,28 @@ class GitHubClient:
         try:
             pr = self.get_pull_request(repo_full_name, pr_number)
             
-            if commit_id:
-                commit = pr.base.repo.get_commit(commit_id)
-            else:
-                # Get the latest commit
-                commits = list(pr.get_commits())
-                commit = commits[-1] if commits else None
-            
-            if commit:
-                pr.create_review(
-                    commit=commit,
-                    body=body,
-                    event=event
-                )
-            else:
-                # Fallback to regular comment
+            # Try issue comment first (more reliable with GitHub Actions token)
+            try:
                 pr.create_issue_comment(body)
+                return
+            except GithubException as issue_comment_error:
+                # If issue comment fails, try create_review as fallback
+                if commit_id:
+                    commit = pr.base.repo.get_commit(commit_id)
+                else:
+                    # Get the latest commit
+                    commits = list(pr.get_commits())
+                    commit = commits[-1] if commits else None
+                
+                if commit:
+                    pr.create_review(
+                        commit=commit,
+                        body=body,
+                        event=event
+                    )
+                else:
+                    # Re-raise the original issue comment error if no fallback worked
+                    raise issue_comment_error
         
         except GithubException as e:
             raise Exception(f"Failed to post review comment: {str(e)}")

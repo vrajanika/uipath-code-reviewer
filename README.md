@@ -192,7 +192,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 - Solution: Make sure all required environment variables are set in your `.env` file or GitHub Secrets
 
 **Issue: "Failed to post review comment"**
-- Solution: Check that your GitHub token has the necessary permissions (`repo` scope for private repos, `public_repo` for public repos)
+- Solution: The bot uses issue comments by default for better compatibility. Check that your GitHub token has `pull-requests: write` and `issues: write` permissions. See [CONFIGURATION.md](docs/CONFIGURATION.md) for details on handling 403 errors.
 
 **Issue: "Error during code review: Rate limit exceeded"**
 - Solution: Azure OpenAI has rate limits. Consider adding retry logic or reducing the frequency of reviews

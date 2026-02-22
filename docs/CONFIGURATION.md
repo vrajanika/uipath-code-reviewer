@@ -29,6 +29,8 @@ This guide provides detailed instructions for configuring the UiPath Code Review
 
 The bot uses API version `2024-02-15-preview` by default. You can change this in your configuration if needed.
 
+**Note:** Check the [Azure OpenAI API versioning documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/api-version-deprecation) for the latest stable or preview API versions. Using a newer version may provide access to additional features or improvements.
+
 ## GitHub Setup
 
 ### Option 1: Personal Access Token (Simpler)

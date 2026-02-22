@@ -1,0 +1,21 @@
+# Azure OpenAI SDK
+openai>=1.0.0
+
+# GitHub API
+PyGithub>=2.1.1
+
+# Web framework for webhook handling
+Flask>=3.0.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# HTTP requests
+requests>=2.31.0
+
+# YAML parsing for UiPath files
+PyYAML>=6.0.1
+
+# Testing
+pytest>=7.4.0
+pytest-mock>=3.12.0

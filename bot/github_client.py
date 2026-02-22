@@ -107,7 +107,12 @@ class GitHubClient:
                 pr.create_issue_comment(body)
                 return
             except GithubException as issue_comment_error:
-                # If issue comment fails, try create_review as fallback
+                # Only fallback to create_review for permission errors (403)
+                # Other errors (network, rate limits, etc.) should propagate immediately
+                if issue_comment_error.status != 403:
+                    raise issue_comment_error
+                
+                # If issue comment fails with 403, try create_review as fallback
                 if commit_id:
                     commit = pr.base.repo.get_commit(commit_id)
                 else:

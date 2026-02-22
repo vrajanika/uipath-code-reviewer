@@ -219,7 +219,9 @@ If you still encounter this error:
    ```
 2. Ensure the bot is not being run on a fork PR with restrictive settings
 3. Check that Actions are enabled for the repository
-4. For fork PRs, consider using `pull_request_target` event with caution (security implications)
+4. For fork PRs, consider using `pull_request_target` event with caution
+   
+   **⚠️ Security Warning**: `pull_request_target` runs with write permissions and uses the workflow from the base branch, which can be risky if not properly secured. Only use this if you trust the PR authors or implement proper security measures. See [GitHub's documentation on pull_request_target](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request_target) for details.
 
 ## Testing Configuration
 

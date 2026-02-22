@@ -57,7 +57,7 @@ class TestGitHubClient:
     
     @patch('bot.github_client.Github')
     def test_post_review_comment_fallback_to_review(self, mock_github_class):
-        """Test fallback to create_review when issue comment fails."""
+        """Test fallback to create_review when issue comment fails with 403."""
         # Setup mocks
         mock_github = MagicMock()
         mock_github_class.return_value = mock_github
@@ -97,6 +97,42 @@ class TestGitHubClient:
             body='Test review',
             event='COMMENT'
         )
+    
+    @patch('bot.github_client.Github')
+    def test_post_review_comment_no_fallback_for_other_errors(self, mock_github_class):
+        """Test that non-403 errors propagate immediately without fallback."""
+        # Setup mocks
+        mock_github = MagicMock()
+        mock_github_class.return_value = mock_github
+        
+        mock_repo = MagicMock()
+        mock_pr = MagicMock()
+        
+        mock_github.get_repo.return_value = mock_repo
+        mock_repo.get_pull.return_value = mock_pr
+        
+        # Make issue comment fail with 429 (rate limit)
+        mock_pr.create_issue_comment.side_effect = GithubException(
+            429, 
+            {'message': 'Rate limit exceeded'},
+            None
+        )
+        
+        # Create client
+        client = GitHubClient(access_token='test-token')
+        
+        # Call method and expect exception
+        with pytest.raises(Exception, match="Failed to post review comment"):
+            client.post_review_comment(
+                repo_full_name='owner/repo',
+                pr_number=1,
+                body='Test review'
+            )
+        
+        # Verify issue comment was attempted
+        mock_pr.create_issue_comment.assert_called_once()
+        # Verify create_review was NOT called (no fallback for non-403 errors)
+        mock_pr.create_review.assert_not_called()
     
     @patch('bot.github_client.Github')
     def test_post_issue_comment(self, mock_github_class):

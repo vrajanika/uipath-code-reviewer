@@ -6,6 +6,8 @@ A GitHub bot that uses Azure OpenAI to automatically review code changes in pull
 
 New here? Check out the [Quick Start Guide](QUICKSTART.md) to get up and running in 5 minutes!
 
+**Having token permission issues?** See [TOKEN_HELP.md](TOKEN_HELP.md) for quick fixes!
+
 ## Features
 
 - 🔍 **Automated Code Review**: Automatically reviews pull requests using Azure OpenAI

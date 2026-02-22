@@ -176,7 +176,7 @@ response = self.client.chat.completions.create(
     model=self.deployment_name,
     messages=[...],
     temperature=0.3,  # Lower = more focused, Higher = more creative
-    max_tokens=2000,  # Adjust response length
+    max_completion_tokens=2000,  # Adjust response length
 )
 ```
 

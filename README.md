@@ -2,6 +2,10 @@
 
 A GitHub bot that uses Azure OpenAI to automatically review code changes in pull requests, with a focus on UiPath automation projects.
 
+## 🚀 Quick Start
+
+New here? Check out the [Quick Start Guide](QUICKSTART.md) to get up and running in 5 minutes!
+
 ## Features
 
 - 🔍 **Automated Code Review**: Automatically reviews pull requests using Azure OpenAI

@@ -2,6 +2,25 @@
 
 Get the UiPath Code Reviewer Bot up and running in 5 minutes!
 
+## Choose Your Setup Method
+
+### Option 1: Use as Shared Workflow (Easiest!) 🌟
+
+**Best for:** Using the bot in your own repositories without managing code.
+
+See the [Shared Workflow Guide](docs/SHARED_WORKFLOW.md) for complete instructions.
+
+**Quick setup:**
+1. Add Azure OpenAI secrets to your repository
+2. Create a workflow file that calls this reusable workflow
+3. Create a PR and see the magic happen!
+
+### Option 2: Self-Hosted Setup
+
+**Best for:** Customizing the bot or running it locally.
+
+Follow the instructions below.
+
 ## Prerequisites
 
 - Python 3.8+

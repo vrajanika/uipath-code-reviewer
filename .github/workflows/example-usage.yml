@@ -1,0 +1,29 @@
+# Example workflow file for calling repositories
+# 
+# This file shows how other repositories can use the UiPath Code Review Bot
+# as a reusable workflow. Copy this file to your repository at:
+# .github/workflows/uipath-code-review.yml
+#
+# IMPORTANT: Do not use this file in the kangtamo/uipath-code-reviewer repository itself.
+# This is an EXAMPLE for OTHER repositories to use.
+
+name: UiPath Code Review (via Shared Workflow)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  call-code-review:
+    uses: kangtamo/uipath-code-reviewer/.github/workflows/code-review.yml@main
+    with:
+      repository: ${{ github.repository }}
+      pr-number: ${{ github.event.pull_request.number }}
+      # Optional: Set to true to review all files instead of just UiPath files
+      all-files: false
+    secrets:
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      AZURE_OPENAI_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
+      AZURE_OPENAI_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -4,7 +4,10 @@ A GitHub bot that uses Azure OpenAI to automatically review code changes in pull
 
 ## 🚀 Quick Start
 
-New here? Check out the [Quick Start Guide](QUICKSTART.md) to get up and running in 5 minutes!
+**Choose your setup method:**
+
+1. **Use as a Shared Workflow** (Recommended) - Use the bot in your own repositories without copying any code → [Shared Workflow Guide](docs/SHARED_WORKFLOW.md)
+2. **Self-Hosted Setup** - Clone and customize for your needs → [Quick Start Guide](QUICKSTART.md)
 
 **Having token permission issues?** See [TOKEN_HELP.md](TOKEN_HELP.md) for quick fixes!
 
@@ -15,6 +18,45 @@ New here? Check out the [Quick Start Guide](QUICKSTART.md) to get up and running
 - 💬 **GitHub Integration**: Posts review comments directly to your pull requests
 - 🔐 **Secure**: Uses Azure OpenAI service with your own LLM deployment
 - ⚙️ **Customizable**: Configurable to review all files or focus on UiPath-specific files
+- 🔄 **Reusable Workflow**: Can be used as a shared workflow across multiple repositories
+
+## Usage Options
+
+### Option 1: Use as a Shared Workflow (Recommended) 🌟
+
+Use the bot in your own repositories without copying any code. Simply create a workflow file in your repository that calls this reusable workflow.
+
+**Quick Setup:**
+1. Add Azure OpenAI secrets to your repository
+2. Create `.github/workflows/uipath-code-review.yml` in your repository:
+
+```yaml
+name: UiPath Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  code-review:
+    uses: kangtamo/uipath-code-reviewer/.github/workflows/code-review.yml@main
+    with:
+      repository: ${{ github.repository }}
+      pr-number: ${{ github.event.pull_request.number }}
+      all-files: false
+    secrets:
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+      AZURE_OPENAI_DEPLOYMENT_NAME: ${{ secrets.AZURE_OPENAI_DEPLOYMENT_NAME }}
+      AZURE_OPENAI_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**📖 Full documentation:** [docs/SHARED_WORKFLOW.md](docs/SHARED_WORKFLOW.md)
+
+### Option 2: Self-Hosted Setup
+
+Clone this repository and run the bot locally or as a GitHub Action in your own fork.
 
 ## Architecture
 
@@ -26,12 +68,19 @@ The bot consists of three main components:
 
 ## Prerequisites
 
+### For Shared Workflow Usage
+- Azure OpenAI service deployment
+- GitHub repository with Actions enabled
+
+### For Self-Hosted Setup
 - Python 3.8 or higher
 - Azure OpenAI service deployment
 - GitHub repository with Actions enabled
 - GitHub Personal Access Token or GitHub App
 
 ## Setup
+
+**Note:** If you're using the shared workflow, skip to the [Shared Workflow Guide](docs/SHARED_WORKFLOW.md). The following instructions are for self-hosted setup only.
 
 ### 1. Clone the Repository
 
@@ -83,7 +132,13 @@ For GitHub Actions to work, configure the following secrets in your repository:
 
 ## Usage
 
-### Automatic Review via GitHub Actions
+### Shared Workflow
+
+See the complete guide at [docs/SHARED_WORKFLOW.md](docs/SHARED_WORKFLOW.md) for using this bot as a reusable workflow in other repositories.
+
+### Self-Hosted Usage
+
+#### Automatic Review via GitHub Actions
 
 The bot automatically reviews pull requests when:
 1. A new pull request is opened
@@ -92,7 +147,7 @@ The bot automatically reviews pull requests when:
 
 The workflow file is located at `.github/workflows/code-review.yml`.
 
-### Manual Review via CLI
+#### Manual Review via CLI
 
 You can also run the bot manually from the command line:
 

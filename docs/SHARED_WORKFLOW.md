@@ -43,6 +43,11 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
 jobs:
   code-review:
     uses: kangtamo/uipath-code-reviewer/.github/workflows/code-review.yml@main

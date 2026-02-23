@@ -56,9 +56,6 @@ jobs:
       AZURE_OPENAI_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
-      AZURE_OPENAI_API_VERSION: ${{ secrets.AZURE_OPENAI_API_VERSION }}
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-```
 
 **📖 Full documentation:** [docs/SHARED_WORKFLOW.md](docs/SHARED_WORKFLOW.md)
 

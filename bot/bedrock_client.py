@@ -94,13 +94,15 @@ class BedrockClient:
 
     def _build_system_prompt(self, file_type: str) -> str:
         """Build the system prompt based on file type."""
-        base_prompt = """You are an expert code reviewer specializing in UiPath automation projects. \
-Your role is to review code changes and provide constructive feedback focusing on:
-1. Code quality and best practices
-2. Potential bugs or issues
-3. Performance improvements
-4. Security concerns
-5. Maintainability and readability"""
+        base_prompt = (
+            "You are an expert code reviewer specializing in UiPath automation projects. "
+            "Your role is to review code changes and provide constructive feedback focusing on:\n"
+            "1. Code quality and best practices\n"
+            "2. Potential bugs or issues\n"
+            "3. Performance improvements\n"
+            "4. Security concerns\n"
+            "5. Maintainability and readability"
+        )
 
         if file_type == 'uipath_workflow':
             return base_prompt + """

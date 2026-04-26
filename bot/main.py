@@ -47,20 +47,22 @@ def main():
     
     # Validate environment variables
     required_env_vars = [
-        'AZURE_OPENAI_ENDPOINT',
-        'AZURE_OPENAI_API_KEY',
-        'AZURE_OPENAI_DEPLOYMENT_NAME',
+        'BEDROCK_MODEL_ID',
+        'AWS_REGION',
         'GITHUB_TOKEN',
     ]
-    
+
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]
     if missing_vars:
         print(f"Error: Missing required environment variables: {', '.join(missing_vars)}")
         print("\nPlease set the following environment variables:")
-        print("  - AZURE_OPENAI_ENDPOINT: Your Azure OpenAI endpoint URL")
-        print("  - AZURE_OPENAI_API_KEY: Your Azure OpenAI API key")
-        print("  - AZURE_OPENAI_DEPLOYMENT_NAME: Your Azure OpenAI deployment/model name")
+        print("  - BEDROCK_MODEL_ID: Claude model ID in Bedrock (e.g. anthropic.claude-3-5-sonnet-20241022-v2:0)")
+        print("  - AWS_REGION: AWS region where Bedrock is enabled (e.g. us-east-1)")
         print("  - GITHUB_TOKEN: GitHub access token")
+        print("\nOptional (not needed when using IAM roles):")
+        print("  - AWS_ACCESS_KEY_ID: AWS access key ID")
+        print("  - AWS_SECRET_ACCESS_KEY: AWS secret access key")
+        print("  - AWS_SESSION_TOKEN: AWS session token for temporary credentials")
         sys.exit(1)
     
     try:

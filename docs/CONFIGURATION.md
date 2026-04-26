@@ -4,32 +4,26 @@ This guide provides detailed instructions for configuring the UiPath Code Review
 
 ## Table of Contents
 
-- [Azure OpenAI Setup](#azure-openai-setup)
+- [AWS Bedrock Setup](#aws-bedrock-setup)
 - [GitHub Setup](#github-setup)
 - [Environment Variables](#environment-variables)
 - [GitHub Actions Configuration](#github-actions-configuration)
 - [Advanced Configuration](#advanced-configuration)
 
-## Azure OpenAI Setup
+## AWS Bedrock Setup
 
-### 1. Create Azure OpenAI Resource
+For a full step-by-step guide on setting up AWS Bedrock with Claude, see **[BEDROCK_SETUP.md](BEDROCK_SETUP.md)**.
 
-1. Go to [Azure Portal](https://portal.azure.com)
-2. Create a new Azure OpenAI resource
-3. Note your endpoint URL (e.g., `https://your-resource-name.openai.azure.com/`)
-4. Get your API key from the resource's "Keys and Endpoint" section
+### Quick Summary
 
-### 2. Deploy a Model
+1. **Create an IAM user or role** in the [AWS IAM Console](https://console.aws.amazon.com/iam/) with the `bedrock:Converse` permission.
+2. **Enable model access** for the desired Claude model in the [AWS Bedrock Console](https://console.aws.amazon.com/bedrock/) → **Model access**.
+3. **Generate an access key** for local use (not needed when using IAM roles on AWS compute or GitHub Actions OIDC).
+4. **Choose a model ID** — recommended: `anthropic.claude-3-5-sonnet-20241022-v2:0`.
 
-1. In your Azure OpenAI resource, go to "Model deployments"
-2. Deploy a model (recommended: GPT-4 or GPT-3.5-turbo)
-3. Note your deployment name
+### Supported Regions
 
-### 3. Configure API Version
-
-The bot uses API version `2024-02-15-preview` by default. You can change this in your configuration if needed.
-
-**Note:** Check the [Azure OpenAI API versioning documentation](https://learn.microsoft.com/en-us/azure/ai-services/openai/api-version-deprecation) for the latest stable or preview API versions. Using a newer version may provide access to additional features or improvements.
+Bedrock Claude models are available in `us-east-1`, `us-west-2`, `eu-west-1`, `eu-central-1`, and more. See [BEDROCK_SETUP.md#supported-aws-regions](BEDROCK_SETUP.md#supported-aws-regions).
 
 ## GitHub Setup
 
@@ -72,10 +66,9 @@ The bot uses API version `2024-02-15-preview` by default. You can change this in
 Create a `.env` file in the project root:
 
 ```env
-# Azure OpenAI Configuration
-AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
-AZURE_OPENAI_API_KEY=your-api-key-here
-AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
+# AWS Bedrock Configuration
+AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
 
 # GitHub Configuration
 GITHUB_TOKEN=your-github-token-here
@@ -84,17 +77,22 @@ GITHUB_TOKEN=your-github-token-here
 ### Optional Variables
 
 ```env
-# API version (default: 2024-02-15-preview)
-AZURE_OPENAI_API_VERSION=2024-02-15-preview
+# AWS credentials — not required when using IAM roles / instance profiles
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+
+# For temporary STS credentials only
+AWS_SESSION_TOKEN=your-session-token
 ```
 
 ### Security Best Practices
 
 1. **Never commit `.env` files** - They're in `.gitignore` by default
-2. **Use different tokens for different environments** - Development vs Production
-3. **Rotate tokens regularly** - Change them every 90 days
-4. **Use minimal permissions** - Only grant what's needed
-5. **Monitor usage** - Check Azure OpenAI usage for unexpected activity
+2. **Use different credentials for different environments** - Development vs Production
+3. **Rotate access keys regularly** - Change them every 90 days
+4. **Prefer IAM roles over access keys** - Use instance profiles or GitHub OIDC where possible
+5. **Use minimal permissions** - Only grant `bedrock:Converse` on Claude model ARNs
+6. **Monitor usage** - Check AWS CloudWatch for unexpected Bedrock API activity
 
 ## GitHub Actions Configuration
 
@@ -107,10 +105,10 @@ AZURE_OPENAI_API_VERSION=2024-02-15-preview
 
 | Secret Name | Description | Example |
 |------------|-------------|---------|
-| `AZURE_OPENAI_ENDPOINT` | Your Azure OpenAI endpoint URL | `https://my-resource.openai.azure.com/` |
-| `AZURE_OPENAI_API_KEY` | Your Azure OpenAI API key | `abc123...` |
-| `AZURE_OPENAI_DEPLOYMENT_NAME` | Your model deployment name | `gpt-4` |
-| `AZURE_OPENAI_API_VERSION` | API version (optional) | `2024-02-15-preview` |
+| `AWS_REGION` | AWS region with Bedrock enabled | `us-east-1` |
+| `BEDROCK_MODEL_ID` | Claude model ID | `anthropic.claude-3-5-sonnet-20241022-v2:0` |
+| `AWS_ACCESS_KEY_ID` | IAM access key ID (skip if using OIDC) | `AKIAIOSFODNN7EXAMPLE` |
+| `AWS_SECRET_ACCESS_KEY` | IAM secret access key (skip if using OIDC) | `wJalrXUtn...` |
 
 **Note:** `GITHUB_TOKEN` is automatically provided by GitHub Actions and doesn't need to be added.
 
@@ -147,7 +145,7 @@ Edit `.github/workflows/code-review.yml` to customize:
 
 ### Custom Review Prompts
 
-To customize review prompts, edit `bot/azure_openai_client.py`:
+To customize review prompts, edit `bot/bedrock_client.py`:
 
 ```python
 def _build_system_prompt(self, file_type: str) -> str:
@@ -169,39 +167,46 @@ def _filter_uipath_files(self, files: List[Dict]) -> List[Dict]:
 
 ### Temperature and Token Limits
 
-Adjust AI behavior in `bot/azure_openai_client.py`:
+Adjust AI behavior in `bot/bedrock_client.py`:
 
 ```python
-response = self.client.chat.completions.create(
-    model=self.deployment_name,
+response = self.client.converse(
+    modelId=self.model_id,
+    system=[{"text": system_prompt}],
     messages=[...],
-    temperature=0.3,  # Lower = more focused, Higher = more creative
-    max_completion_tokens=2000,  # Adjust response length
+    inferenceConfig={
+        "temperature": 0.3,   # Lower = more focused, Higher = more creative
+        "maxTokens": 2000,    # Adjust response length
+    },
 )
 ```
 
 ## Troubleshooting
 
-### Issue: "Authentication failed"
+### Issue: "Authentication failed" / "NoCredentialsError"
 
 **Solution:**
-- Verify your API key is correct
-- Check if the key has expired
-- Ensure the endpoint URL is correct
+- Set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, or attach an IAM role to your compute environment
+- If using `~/.aws/credentials`, check that `AWS_PROFILE` or the `[default]` profile is configured
 
-### Issue: "Model not found"
-
-**Solution:**
-- Verify the deployment name matches exactly
-- Check if the deployment is active in Azure portal
-- Ensure you have access to the deployment
-
-### Issue: "Rate limit exceeded"
+### Issue: "AccessDeniedException"
 
 **Solution:**
-- Check your Azure OpenAI quota
-- Add rate limiting in the code
-- Review fewer files at once
+- Verify the IAM user/role has `bedrock:Converse` permission
+- Enable model access for the chosen Claude model in the Bedrock console
+- See [BEDROCK_SETUP.md](BEDROCK_SETUP.md) for the full setup walkthrough
+
+### Issue: "ValidationException: The provided model identifier is invalid"
+
+**Solution:**
+- Verify `BEDROCK_MODEL_ID` matches exactly (including version suffix, e.g. `-v2:0`)
+- Check that the model is available in your selected `AWS_REGION`
+
+### Issue: "ThrottlingException"
+
+**Solution:**
+- Check your [Bedrock service quotas](https://console.aws.amazon.com/servicequotas/home/services/bedrock/quotas)
+- Add rate limiting in the code or reduce the frequency of reviews
 
 ### Issue: Bot doesn't comment on PRs
 
@@ -260,9 +265,10 @@ If you still encounter this error:
 
 ```bash
 # Set environment variables
-export AZURE_OPENAI_ENDPOINT="https://..."
-export AZURE_OPENAI_API_KEY="..."
-export AZURE_OPENAI_DEPLOYMENT_NAME="..."
+export AWS_REGION="us-east-1"
+export BEDROCK_MODEL_ID="anthropic.claude-3-5-sonnet-20241022-v2:0"
+export AWS_ACCESS_KEY_ID="..."
+export AWS_SECRET_ACCESS_KEY="..."
 export GITHUB_TOKEN="..."
 
 # Test with a PR
@@ -280,7 +286,8 @@ python -m bot.main --repo owner/repo --pr-number 1 --no-post
 ## Best Practices
 
 1. **Start with small PRs** - Test on smaller PRs first
-2. **Monitor costs** - Azure OpenAI charges per token
+2. **Monitor costs** - AWS Bedrock charges per input/output token
 3. **Review the reviews** - AI isn't perfect, verify suggestions
 4. **Iterate on prompts** - Improve prompts based on review quality
 5. **Set expectations** - Let your team know this is a tool, not a replacement for human review
+6. **Use IAM roles** - Prefer roles over long-lived access keys for production deployments

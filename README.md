@@ -1,6 +1,6 @@
 # UiPath Code Reviewer Bot 🤖
 
-A GitHub bot that uses Azure OpenAI to automatically review code changes in pull requests, with a focus on UiPath automation projects.
+A GitHub bot that uses Claude on AWS Bedrock to automatically review code changes in pull requests, with a focus on UiPath automation projects.
 
 ## 🚀 Quick Start
 
@@ -10,24 +10,24 @@ New here? Check out the [Quick Start Guide](QUICKSTART.md) to get up and running
 
 ## Features
 
-- 🔍 **Automated Code Review**: Automatically reviews pull requests using Azure OpenAI
+- 🔍 **Automated Code Review**: Automatically reviews pull requests using Claude on AWS Bedrock
 - 🎯 **UiPath-Focused**: Specialized prompts for reviewing UiPath XAML workflows and configurations
 - 💬 **GitHub Integration**: Posts review comments directly to your pull requests
-- 🔐 **Secure**: Uses Azure OpenAI service with your own LLM deployment
+- 🔐 **Secure**: Uses AWS Bedrock with your own AWS account — no third-party proxy
 - ⚙️ **Customizable**: Configurable to review all files or focus on UiPath-specific files
 
 ## Architecture
 
 The bot consists of three main components:
 
-1. **Azure OpenAI Client** (`bot/azure_openai_client.py`): Handles communication with Azure OpenAI service
+1. **Bedrock Client** (`bot/bedrock_client.py`): Handles communication with Claude via AWS Bedrock
 2. **GitHub Client** (`bot/github_client.py`): Manages GitHub API interactions
 3. **Code Reviewer** (`bot/reviewer.py`): Orchestrates the review process
 
 ## Prerequisites
 
 - Python 3.8 or higher
-- Azure OpenAI service deployment
+- AWS account with Bedrock access and Claude model access enabled
 - GitHub repository with Actions enabled
 - GitHub Personal Access Token or GitHub App
 
@@ -54,18 +54,22 @@ Copy the example environment file and configure it:
 cp .env.example .env
 ```
 
-Edit `.env` with your Azure OpenAI and GitHub credentials:
+Edit `.env` with your AWS Bedrock and GitHub credentials:
 
 ```env
-# Azure OpenAI Configuration
-AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
-AZURE_OPENAI_API_KEY=your-api-key-here
-AZURE_OPENAI_DEPLOYMENT_NAME=your-deployment-name
-AZURE_OPENAI_API_VERSION=2024-02-15-preview
+# AWS Bedrock Configuration
+AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+
+# AWS Credentials (not needed when using IAM roles / instance profiles)
+AWS_ACCESS_KEY_ID=your-access-key-id-here
+AWS_SECRET_ACCESS_KEY=your-secret-access-key-here
 
 # GitHub Configuration
 GITHUB_TOKEN=your-github-token-here
 ```
+
+**📚 For detailed Bedrock setup instructions, see [docs/BEDROCK_SETUP.md](docs/BEDROCK_SETUP.md)**
 
 **📚 For detailed instructions on creating a GitHub token with the correct permissions, see [docs/TOKEN_SETUP.md](docs/TOKEN_SETUP.md)**
 
@@ -75,10 +79,10 @@ For GitHub Actions to work, configure the following secrets in your repository:
 
 1. Go to your repository Settings → Secrets and variables → Actions
 2. Add the following secrets:
-   - `AZURE_OPENAI_ENDPOINT`: Your Azure OpenAI endpoint URL
-   - `AZURE_OPENAI_API_KEY`: Your Azure OpenAI API key
-   - `AZURE_OPENAI_DEPLOYMENT_NAME`: Your deployment/model name
-   - `AZURE_OPENAI_API_VERSION`: API version (e.g., `2024-02-15-preview`)
+   - `AWS_REGION`: AWS region where Bedrock is enabled (e.g. `us-east-1`)
+   - `BEDROCK_MODEL_ID`: Claude model ID (e.g. `anthropic.claude-3-5-sonnet-20241022-v2:0`)
+   - `AWS_ACCESS_KEY_ID`: Your AWS access key ID
+   - `AWS_SECRET_ACCESS_KEY`: Your AWS secret access key
    - `GITHUB_TOKEN`: Automatically provided by GitHub Actions
 
 ## Usage
@@ -164,18 +168,22 @@ The bot automatically identifies and appropriately reviews:
 uipath-code-reviewer/
 ├── bot/
 │   ├── __init__.py
-│   ├── azure_openai_client.py  # Azure OpenAI integration
-│   ├── github_client.py         # GitHub API integration
-│   ├── reviewer.py              # Main review orchestrator
-│   └── main.py                  # CLI entry point
-├── tests/                       # Unit tests
+│   ├── bedrock_client.py    # AWS Bedrock / Claude integration
+│   ├── github_client.py     # GitHub API integration
+│   ├── reviewer.py          # Main review orchestrator
+│   └── main.py              # CLI entry point
+├── tests/                   # Unit tests
+├── docs/
+│   ├── BEDROCK_SETUP.md     # AWS Bedrock setup guide
+│   ├── CONFIGURATION.md     # Full configuration reference
+│   └── TOKEN_SETUP.md       # GitHub token setup guide
 ├── .github/
 │   └── workflows/
-│       └── code-review.yml      # GitHub Actions workflow
-├── requirements.txt             # Python dependencies
-├── setup.py                     # Package setup
-├── .env.example                 # Environment variables template
-└── README.md                    # This file
+│       └── code-review.yml  # GitHub Actions workflow
+├── requirements.txt         # Python dependencies
+├── setup.py                 # Package setup
+├── .env.example             # Environment variables template
+└── README.md                # This file
 ```
 
 ### Running Tests
@@ -193,7 +201,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ### Common Issues
 
 **Issue: "Missing required environment variables"**
-- Solution: Make sure all required environment variables are set in your `.env` file or GitHub Secrets
+- Solution: Make sure `AWS_REGION`, `BEDROCK_MODEL_ID`, and `GITHUB_TOKEN` are set in your `.env` file or GitHub Secrets
 
 **Issue: "Failed to post review comment"** or **"403 Forbidden"** or **"Resource not accessible"**
 - **Solution:** This is a token permission issue. The bot uses issue comments by default for better compatibility.
@@ -209,16 +217,20 @@ Contributions are welcome! Please feel free to submit a Pull Request.
   
   📚 **Full troubleshooting guide:** [docs/TOKEN_SETUP.md#troubleshooting](docs/TOKEN_SETUP.md#troubleshooting)
 
-**Issue: "Error during code review: Rate limit exceeded"**
-- Solution: Azure OpenAI has rate limits. Consider adding retry logic or reducing the frequency of reviews
+**Issue: "AccessDeniedException" from Bedrock**
+- Solution: Ensure your IAM user/role has `bedrock:Converse` permission and that you have enabled model access for the chosen Claude model in the Bedrock console. See [docs/BEDROCK_SETUP.md](docs/BEDROCK_SETUP.md).
+
+**Issue: "ThrottlingException" from Bedrock**
+- Solution: You have exceeded Bedrock's rate limits. Consider adding retry logic or reviewing fewer files at once. Check your service quotas in the AWS console.
 
 **Issue: Bot doesn't trigger on PR**
 - Solution: Ensure GitHub Actions is enabled in your repository and the workflow file is in the correct location
 
 ## Security Considerations
 
-- Never commit your `.env` file or expose your API keys
+- Never commit your `.env` file or expose your AWS credentials
 - Use GitHub Secrets for sensitive configuration in Actions
+- Prefer IAM roles over long-lived access keys wherever possible
 - The bot only reads PR data and posts comments; it doesn't modify code
 - Review the permissions granted to the GitHub token
 
@@ -228,6 +240,6 @@ This project is licensed under the MIT License.
 
 ## Acknowledgments
 
-- Powered by [Azure OpenAI Service](https://azure.microsoft.com/en-us/products/ai-services/openai-service)
+- Powered by [Claude on AWS Bedrock](https://aws.amazon.com/bedrock/claude/)
 - Built for [UiPath](https://www.uipath.com/) automation projects
 - Uses [PyGithub](https://github.com/PyGithub/PyGithub) for GitHub API integration

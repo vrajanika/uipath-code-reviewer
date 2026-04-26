@@ -5,7 +5,7 @@ Get the UiPath Code Reviewer Bot up and running in 5 minutes!
 ## Prerequisites
 
 - Python 3.8+
-- Azure OpenAI service with a deployed model
+- AWS account with Bedrock access and Claude model access enabled
 - GitHub account with repository access
 
 ## Step 1: Clone and Install (2 minutes)
@@ -25,18 +25,20 @@ cp .env.example .env
 
 Edit `.env` with your credentials:
 ```env
-AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
-AZURE_OPENAI_API_KEY=your-api-key-here
-AZURE_OPENAI_DEPLOYMENT_NAME=gpt-4
+AWS_REGION=us-east-1
+BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
 GITHUB_TOKEN=your-github-token-here
 ```
 
 **Where to get these values:**
-- Azure OpenAI Endpoint: Azure Portal → Your OpenAI Resource → Keys and Endpoint
-- API Key: Same location as endpoint
-- Deployment Name: Azure Portal → Your OpenAI Resource → Model deployments
-- **GitHub Token**: See [docs/TOKEN_SETUP.md](docs/TOKEN_SETUP.md) for detailed instructions on creating a token with the correct permissions
+- AWS Region & credentials: [AWS IAM Console](https://console.aws.amazon.com/iam/) — create an IAM user with `bedrock:Converse` permission
+- Bedrock Model ID: pick one from [docs/BEDROCK_SETUP.md](docs/BEDROCK_SETUP.md#step-4-choose-a-claude-model-id)
+- **GitHub Token**: See [docs/TOKEN_SETUP.md](docs/TOKEN_SETUP.md) for detailed instructions
   - Quick: GitHub Settings → Developer settings → Personal access tokens → Generate with `repo` scope
+
+**📚 Full Bedrock setup:** [docs/BEDROCK_SETUP.md](docs/BEDROCK_SETUP.md)
 
 ## Step 3: Test Locally (1 minute)
 
@@ -52,9 +54,10 @@ If you want automatic reviews on all PRs:
 1. Go to your GitHub repository
 2. Settings → Secrets and variables → Actions
 3. Add these secrets:
-   - `AZURE_OPENAI_ENDPOINT`
-   - `AZURE_OPENAI_API_KEY`
-   - `AZURE_OPENAI_DEPLOYMENT_NAME`
+   - `AWS_REGION`
+   - `BEDROCK_MODEL_ID`
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
 
 That's it! The bot will now automatically review PRs when they're opened.
 
@@ -106,7 +109,7 @@ The workflow shows good structure with proper error handling. Here are some sugg
 
 ---
 
-*Review powered by Azure OpenAI*
+*Review powered by Claude on AWS Bedrock*
 ```
 
 ## Troubleshooting
@@ -117,17 +120,22 @@ The workflow shows good structure with proper error handling. Here are some sugg
 - Check workflow logs in Actions tab
 
 **"Missing required environment variables"?**
-- Ensure all variables in `.env` are set
+- Ensure `AWS_REGION`, `BEDROCK_MODEL_ID`, and `GITHUB_TOKEN` are set in `.env`
 - No quotes needed around values in `.env`
 
-**"Rate limit exceeded"?**
-- Check Azure OpenAI quota
-- Add delays between reviews
-- Consider using a higher-tier Azure plan
+**"AccessDeniedException" from AWS?**
+- Verify IAM user has `bedrock:Converse` permission
+- Enable model access in the Bedrock console for your region
+- See [docs/BEDROCK_SETUP.md](docs/BEDROCK_SETUP.md) for full setup guide
+
+**"ThrottlingException"?**
+- Check Bedrock service quotas
+- Add delays between reviews or review fewer files
 
 ## Next Steps
 
 - Read the full [README.md](README.md) for detailed features
+- Check [docs/BEDROCK_SETUP.md](docs/BEDROCK_SETUP.md) for Bedrock setup
 - Check [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for advanced setup
 - See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute
 - Review [examples.py](examples.py) for programmatic usage

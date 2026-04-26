@@ -3,27 +3,27 @@ Main code reviewer orchestrator.
 """
 
 from typing import Optional, List, Dict
-from .azure_openai_client import AzureOpenAIClient
+from .bedrock_client import BedrockClient
 from .github_client import GitHubClient
 
 
 class CodeReviewer:
-    """Orchestrates code review process using Azure OpenAI and GitHub."""
-    
+    """Orchestrates code review process using AWS Bedrock Claude and GitHub."""
+
     def __init__(
         self,
         github_client: Optional[GitHubClient] = None,
-        azure_client: Optional[AzureOpenAIClient] = None,
+        bedrock_client: Optional[BedrockClient] = None,
     ):
         """
         Initialize the code reviewer.
-        
+
         Args:
             github_client: GitHub client instance
-            azure_client: Azure OpenAI client instance
+            bedrock_client: AWS Bedrock client instance
         """
         self.github_client = github_client or GitHubClient()
-        self.azure_client = azure_client or AzureOpenAIClient()
+        self.bedrock_client = bedrock_client or BedrockClient()
     
     def review_pull_request(
         self,
@@ -132,7 +132,7 @@ class CodeReviewer:
         patch = file['patch']
         
         try:
-            review_comment = self.azure_client.review_code(
+            review_comment = self.bedrock_client.review_code(
                 diff=patch,
                 file_path=filename,
                 context=None
@@ -176,6 +176,6 @@ class CodeReviewer:
                 review_parts.append("---")
                 review_parts.append("")
         
-        review_parts.append("*Review powered by Azure OpenAI*")
+        review_parts.append("*Review powered by Claude on AWS Bedrock*")
         
         return "\n".join(review_parts)

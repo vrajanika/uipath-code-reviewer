@@ -1,5 +1,5 @@
-# Azure OpenAI SDK
-openai>=1.0.0
+# AWS SDK for Bedrock
+boto3>=1.34.0
 
 # GitHub API
 PyGithub>=2.1.1

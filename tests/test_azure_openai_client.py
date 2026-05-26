@@ -110,3 +110,82 @@ class TestAzureOpenAIClient:
         
         assert result == "Great code!"
         mock_client.chat.completions.create.assert_called_once()
+
+    @patch('bot.azure_openai_client.AzureOpenAI')
+    def test_review_code_structured_success(self, mock_azure_openai):
+        """Test structured review returns parsed JSON."""
+        mock_client = MagicMock()
+        json_response = '{"summary": "Looks good", "comments": [{"line": 5, "body": "Fix this", "severity": "issue"}]}'
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock(message=MagicMock(content=json_response))]
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_azure_openai.return_value = mock_client
+
+        client = AzureOpenAIClient(
+            azure_endpoint='https://test.openai.azure.com/',
+            api_key='test-key',
+            deployment_name='test-deployment',
+        )
+
+        result = client.review_code_structured(diff="+ new line", file_path="test.py")
+        assert result['summary'] == 'Looks good'
+        assert len(result['comments']) == 1
+        assert result['comments'][0]['line'] == 5
+        assert result['comments'][0]['body'] == 'Fix this'
+        assert result['comments'][0]['severity'] == 'issue'
+
+    @patch('bot.azure_openai_client.AzureOpenAI')
+    def test_review_code_structured_invalid_json_fallback(self, mock_azure_openai):
+        """Test fallback when AI returns non-JSON."""
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock(message=MagicMock(content="This is just plain text"))]
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_azure_openai.return_value = mock_client
+
+        client = AzureOpenAIClient(
+            azure_endpoint='https://test.openai.azure.com/',
+            api_key='test-key',
+            deployment_name='test-deployment',
+        )
+
+        result = client.review_code_structured(diff="+ line", file_path="test.py")
+        assert result['summary'] == "This is just plain text"
+        assert result['comments'] == []
+
+    def test_parse_ai_response_with_code_fences(self):
+        """Test parsing JSON wrapped in markdown code fences."""
+        client = AzureOpenAIClient(
+            azure_endpoint='https://test.openai.azure.com/',
+            api_key='test-key',
+            deployment_name='test-deployment',
+        )
+        raw = '```json\n{"summary": "ok", "comments": []}\n```'
+        result = client._parse_ai_response(raw)
+        assert result['summary'] == 'ok'
+        assert result['comments'] == []
+
+    def test_parse_ai_response_missing_summary(self):
+        """Test parsing JSON with missing summary field."""
+        client = AzureOpenAIClient(
+            azure_endpoint='https://test.openai.azure.com/',
+            api_key='test-key',
+            deployment_name='test-deployment',
+        )
+        raw = '{"comments": [{"line": 1, "body": "test"}]}'
+        result = client._parse_ai_response(raw)
+        assert result['summary'] == 'Review completed.'
+        assert len(result['comments']) == 1
+        assert result['comments'][0]['severity'] == 'suggestion'
+
+    def test_parse_ai_response_invalid_comments_skipped(self):
+        """Test that comments without required fields are skipped."""
+        client = AzureOpenAIClient(
+            azure_endpoint='https://test.openai.azure.com/',
+            api_key='test-key',
+            deployment_name='test-deployment',
+        )
+        raw = '{"summary": "ok", "comments": [{"line": 1, "body": "valid"}, {"bad": "entry"}, "not a dict"]}'
+        result = client._parse_ai_response(raw)
+        assert len(result['comments']) == 1
+        assert result['comments'][0]['body'] == 'valid'

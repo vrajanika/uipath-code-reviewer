@@ -192,3 +192,69 @@ class TestGitHubClient:
         assert files[0]['filename'] == 'test.xaml'
         assert files[0]['additions'] == 10
         assert files[0]['deletions'] == 5
+
+    @patch('bot.github_client.Github')
+    def test_post_inline_review_success(self, mock_github_class):
+        """Test posting inline review with comments."""
+        mock_github = MagicMock()
+        mock_github_class.return_value = mock_github
+        mock_repo = MagicMock()
+        mock_pr = MagicMock()
+        mock_commit = MagicMock()
+        mock_github.get_repo.return_value = mock_repo
+        mock_repo.get_pull.return_value = mock_pr
+        mock_pr.get_commits.return_value = [mock_commit]
+
+        client = GitHubClient(access_token='test-token')
+        comments = [
+            {"path": "test.py", "position": 3, "body": "Fix this"},
+        ]
+        client.post_inline_review('owner/repo', 1, comments, "Summary")
+
+        mock_pr.create_review.assert_called_once_with(
+            commit=mock_commit,
+            body="Summary",
+            event="COMMENT",
+            comments=comments,
+        )
+
+    @patch('bot.github_client.Github')
+    def test_post_inline_review_empty_comments_uses_issue_comment(self, mock_github_class):
+        """When no inline comments, fall back to issue comment."""
+        mock_github = MagicMock()
+        mock_github_class.return_value = mock_github
+        mock_repo = MagicMock()
+        mock_pr = MagicMock()
+        mock_github.get_repo.return_value = mock_repo
+        mock_repo.get_pull.return_value = mock_pr
+
+        client = GitHubClient(access_token='test-token')
+        client.post_inline_review('owner/repo', 1, [], "Summary only")
+
+        mock_pr.create_issue_comment.assert_called_once_with("Summary only")
+        mock_pr.create_review.assert_not_called()
+
+    @patch('bot.github_client.Github')
+    def test_post_inline_review_403_fallback(self, mock_github_class):
+        """Test 403 fallback to issue comment with formatted body."""
+        mock_github = MagicMock()
+        mock_github_class.return_value = mock_github
+        mock_repo = MagicMock()
+        mock_pr = MagicMock()
+        mock_commit = MagicMock()
+        mock_github.get_repo.return_value = mock_repo
+        mock_repo.get_pull.return_value = mock_pr
+        mock_pr.get_commits.return_value = [mock_commit]
+        mock_pr.create_review.side_effect = GithubException(
+            403, {'message': 'Forbidden'}, None
+        )
+
+        client = GitHubClient(access_token='test-token')
+        comments = [{"path": "test.py", "position": 3, "body": "Fix this"}]
+        client.post_inline_review('owner/repo', 1, comments, "Summary")
+
+        # Should have fallen back to issue comment
+        mock_pr.create_issue_comment.assert_called_once()
+        call_body = mock_pr.create_issue_comment.call_args[0][0]
+        assert "Summary" in call_body
+        assert "Fix this" in call_body

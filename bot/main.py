@@ -8,6 +8,11 @@ import os
 from dotenv import load_dotenv
 from .reviewer import CodeReviewer
 
+# Ensure UTF-8 output on Windows
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 
 def main():
     """Main function to run the code review bot."""
@@ -36,6 +41,11 @@ def main():
         '--all-files',
         action='store_true',
         help='Review all files, not just UiPath files'
+    )
+    parser.add_argument(
+        '--no-inline',
+        action='store_true',
+        help='Disable inline comments; use legacy single-comment mode'
     )
     parser.add_argument(
         '--output',
@@ -75,6 +85,7 @@ def main():
             pr_number=args.pr_number,
             post_comments=not args.no_post,
             focus_on_uipath=not args.all_files,
+            inline_comments=not args.no_inline,
         )
         
         print(f"Review status: {result['status']}")
@@ -82,9 +93,19 @@ def main():
         
         if 'overall_review' in result:
             # Save review to file
-            with open(args.output, 'w') as f:
+            with open(args.output, 'w', encoding='utf-8') as f:
                 f.write(result['overall_review'])
+
+                # Append inline comments for visibility in output file
+                if result.get('inline_comments'):
+                    f.write("\n\n---\n\n## Inline Comments\n\n")
+                    for ic in result['inline_comments']:
+                        f.write(f"- **{ic['path']}** (pos {ic['position']}): {ic['body']}\n")
+
             print(f"Review saved to {args.output}")
+
+        if result.get('inline_comments'):
+            print(f"Generated {len(result['inline_comments'])} inline comment(s)")
         
         # Exit with appropriate code
         if result['status'] in ['success', 'partial_success']:

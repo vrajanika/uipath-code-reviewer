@@ -3,7 +3,9 @@ Azure OpenAI client for code review.
 """
 
 import os
-from typing import Optional
+import json
+import re
+from typing import Optional, Dict, List
 from openai import AzureOpenAI
 
 
@@ -77,6 +79,160 @@ class AzureOpenAIClient:
         except Exception as e:
             return f"Error during code review: {str(e)}"
     
+    def review_code_structured(self, diff: str, file_path: str, context: Optional[str] = None) -> Dict:
+        """
+        Review code changes and return structured inline comments.
+
+        Args:
+            diff: Git diff of the changes
+            file_path: Path to the file being reviewed
+            context: Additional context about the changes
+
+        Returns:
+            Dict with keys:
+                - "comments": list of inline comment dicts (line, body, severity)
+                - "summary": str, overall summary for the file
+
+            Falls back to {"comments": [], "summary": <raw text>} on parse failure.
+        """
+        file_type = self._get_file_type(file_path)
+
+        system_prompt = self._build_structured_system_prompt(file_type)
+        user_prompt = self._build_structured_user_prompt(diff, file_path, context)
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.deployment_name,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.3,
+                max_completion_tokens=2000,
+            )
+
+            raw_text = response.choices[0].message.content
+            return self._parse_ai_response(raw_text)
+        except Exception as e:
+            return {
+                "summary": f"Error during code review: {str(e)}",
+                "comments": [],
+            }
+
+    def _parse_ai_response(self, response_text: str) -> Dict:
+        """
+        Parse the AI's response text into structured format.
+
+        Strips markdown code fences if present, then attempts JSON parsing.
+        Falls back to treating the raw text as a summary if parsing fails.
+        """
+        text = response_text.strip()
+
+        # Strip markdown code fences (```json ... ``` or ``` ... ```)
+        fence_match = re.search(r'```(?:json)?\s*\n?(.*?)\n?\s*```', text, re.DOTALL)
+        if fence_match:
+            text = fence_match.group(1).strip()
+
+        try:
+            parsed = json.loads(text)
+
+            if not isinstance(parsed, dict):
+                raise ValueError("Response is not a JSON object")
+
+            if "summary" not in parsed:
+                parsed["summary"] = "Review completed."
+
+            if "comments" not in parsed or not isinstance(parsed["comments"], list):
+                parsed["comments"] = []
+
+            # Validate each comment
+            valid_comments = []
+            for c in parsed["comments"]:
+                if isinstance(c, dict) and "line" in c and "body" in c:
+                    valid_comments.append({
+                        "line": int(c["line"]),
+                        "body": str(c["body"]),
+                        "severity": c.get("severity", "suggestion"),
+                    })
+            parsed["comments"] = valid_comments
+
+            return parsed
+        except (json.JSONDecodeError, ValueError, TypeError):
+            return {
+                "summary": response_text,
+                "comments": [],
+            }
+
+    def _build_structured_system_prompt(self, file_type: str) -> str:
+        """Build system prompt that instructs AI to return structured JSON."""
+        base_prompt = """You are an expert code reviewer. Review code changes and provide feedback as structured JSON.
+
+You MUST respond with valid JSON only. No markdown, no extra text outside the JSON.
+
+Use this exact schema:
+{
+  "summary": "Brief overall assessment of changes in this file (1-3 sentences).",
+  "comments": [
+    {
+      "line": <new-file line number from the diff>,
+      "body": "Your feedback for this specific line.",
+      "severity": "issue|suggestion|nitpick|praise"
+    }
+  ]
+}
+
+Rules for the "line" field:
+- Use the NEW file line number (the number after + in @@ -old +new @@)
+- Only reference lines that appear in the diff (added or context lines)
+- Do NOT reference deleted lines (lines starting with -)
+- If you have general feedback not tied to a specific line, put it in "summary"
+
+Severity meanings:
+- "issue": Bug, potential error, or correctness problem
+- "suggestion": Improvement that would make the code better
+- "nitpick": Minor style or convention preference
+- "praise": Something done well worth calling out
+
+Keep comments concise and actionable. Aim for 1-5 inline comments per file.
+If the changes look good with no issues, return an empty comments array and a positive summary."""
+
+        if file_type == 'uipath_workflow':
+            base_prompt += """
+
+Focus areas for UiPath XAML workflow files:
+- Error handling and retry logic
+- Selector usage and reliability
+- Variable scope and naming conventions
+- Workflow structure and modularity
+- Try-Catch blocks, delays, and timeouts"""
+
+        elif file_type == 'uipath_config':
+            base_prompt += """
+
+Focus areas for UiPath configuration files:
+- Configuration structure
+- Secure handling of credentials and sensitive data
+- Environment-specific settings
+- Validation of configuration values"""
+
+        return base_prompt
+
+    def _build_structured_user_prompt(self, diff: str, file_path: str, context: Optional[str] = None) -> str:
+        """Build user prompt for structured JSON review."""
+        prompt = f"""Review the following code changes for: {file_path}
+
+Diff (unified format):
+```
+{diff}
+```"""
+
+        if context:
+            prompt += f"\n\nAdditional context: {context}"
+
+        prompt += "\n\nRespond with JSON only. Follow the schema in your instructions."
+
+        return prompt
+
     def _get_file_type(self, file_path: str) -> str:
         """Determine the type of file based on extension."""
         if file_path.endswith('.xaml'):

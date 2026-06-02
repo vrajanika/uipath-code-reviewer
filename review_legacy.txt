@@ -1,0 +1,2459 @@
+## 🤖 UiPath Code Review
+
+Reviewed 23 file(s) in this pull request.
+
+### 📄 `.env.example`
+*Changes: +8 -0*
+
+**Code Review for .env.example**
+
+Thank you for providing the .env.example file. Below is my review focusing on code quality, best practices, potential issues, and security concerns:
+
+---
+
+### 1. Issues or Bugs Identified
+
+- **No functional bugs**: As this is an example environment file, there are no direct code bugs. However, there are a few areas for improvement to help users avoid misconfiguration.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Add Descriptive Comments**: While you have section headers, consider adding inline comments for each variable to clarify what values are expected. This helps new users understand what each variable is for.
+  
+  ```env
+  # The endpoint URL of your Azure OpenAI resource (e.g., https://my-openai-resource.openai.azure.com/)
+  AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
+  ```
+
+- **Placeholder Consistency**: Use consistent placeholder values (e.g., `<your-api-key>`, `<your-deployment-name>`) to clearly indicate where users should replace values.
+
+- **Variable Naming**: The variable names are clear and follow conventional uppercase with underscores. Good job!
+
+- **Order and Grouping**: Consider grouping related variables together and separating sections with clear comments for readability.
+
+---
+
+### 3. Best Practices
+
+- **Never Commit Real Secrets**: Ensure that only example or placeholder values are ever committed to version control. The current file follows this practice—well done.
+
+- **.env File in .gitignore**: Make sure the actual `.env` file is listed in `.gitignore` to prevent accidental commits of real secrets.
+
+- **Document Required vs. Optional Variables**: If any of these variables are optional, indicate this in the comments.
+
+- **Consistent Formatting**: Maintain consistent spacing and formatting for readability.
+
+---
+
+### 4. Security Concerns
+
+- **Sensitive Information**: Remind users not to share their actual `.env` files or real secrets. Consider adding a comment at the top:
+  
+  ```env
+  # DO NOT COMMIT THIS FILE WITH REAL SECRETS. THIS IS AN EXAMPLE TEMPLATE.
+  ```
+
+- **Token Scope**: For variables like `GITHUB_TOKEN`, document the minimum required permissions to follow the principle of least privilege.
+
+---
+
+### Sample Improved .env.example
+
+```env
+# DO NOT COMMIT THIS FILE WITH REAL SECRETS. THIS IS AN EXAMPLE TEMPLATE.
+
+# Azure OpenAI Configuration
+# The endpoint URL of your Azure OpenAI resource (e.g., https://my-openai-resource.openai.azure.com/)
+AZURE_OPENAI_ENDPOINT=https://your-resource-name.openai.azure.com/
+# Your Azure OpenAI API key
+AZURE_OPENAI_API_KEY=<your-api-key>
+# The deployment name for your Azure OpenAI model
+AZURE_OPENAI_DEPLOYMENT_NAME=<your-deployment-name>
+# The API version to use (e.g., 2024-02-15-preview)
+AZURE_OPENAI_API_VERSION=2024-02-15-preview
+
+# GitHub Configuration
+# A GitHub personal access token with the minimum required scopes (e.g., repo, workflow)
+GITHUB_TOKEN=<your-github-token>
+```
+
+---
+
+**Summary of Actionable Feedback:**
+
+1. Add a warning comment at the top about not committing real secrets.
+2. Use consistent placeholder syntax (e.g., `<your-api-key>`).
+3. Add inline comments describing each variable and expected values.
+4. Document required permissions for sensitive tokens.
+5. Ensure `.env` is in `.gitignore` (not shown here, but important).
+
+Let me know if you need further clarification or help updating the file!
+
+---
+
+### 📄 `.github/workflows/code-review.yml`
+*Changes: +71 -0*
+
+**UiPath Code Review Bot Workflow – Code Review**
+
+---
+
+### 1. Issues & Potential Bugs
+
+- **Conditional Job Execution (`if:`):**
+  - The workflow uses a custom `if:` condition at the job level. While this is supported, the logic may miss some edge cases:
+    - `github.event.issue.pull_request` is only present for issue comments on PRs, but not for regular issues. The condition seems correct, but consider adding more explicit checks or comments for maintainability.
+    - The use of `contains(github.event.comment.body, '@uipath-reviewer')` is good, but if the bot username changes, this will break. Consider parameterizing the bot mention.
+
+- **PR Number Extraction:**
+  - In the `Run code review` step, the PR number is extracted as:
+    ```bash
+    --pr-number "${{ github.event.pull_request.number || github.event.issue.number }}"
+    ```
+    - This syntax works in JavaScript, but GitHub Actions expressions do **not** support `||` for fallback. Instead, use `${{ github.event.pull_request.number }}` and `${{ github.event.issue.number }}` with a conditional or a custom step to set the value.
+    - This could cause the PR number to be empty, leading to failures in the bot.
+
+- **Post Review Result Step:**
+  - The `issue_number` field uses:
+    ```js
+    issue_number: context.payload.pull_request?.number || context.payload.issue.number,
+    ```
+    - This is correct in JavaScript, but if neither is present, it will be undefined and could fail. Consider adding error handling or logging.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Parameterize Bot Mention:**
+  - Define the bot mention as an environment variable or workflow input for easier updates.
+
+- **Robust PR Number Extraction:**
+  - Add a step to explicitly set the PR number as an environment variable, using shell scripting:
+    ```yaml
+    - name: Set PR number
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+        else
+          echo "PR_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
+        fi
+    ```
+    - Then reference `${{ env.PR_NUMBER }}` in subsequent steps.
+
+- **Error Handling in Post Review Result:**
+  - Add error handling/logging if `review_result.txt` does not exist or is empty.
+  - Consider posting a message if the review failed or produced no output.
+
+- **Secrets Management:**
+  - Ensure that all secrets (Azure OpenAI and GitHub Token) are set and have minimal required permissions.
+
+- **Dependency Installation:**
+  - If `requirements.txt` is missing or incomplete, the workflow will fail. Consider adding a check or fallback.
+
+---
+
+### 3. Best Practices
+
+- **Minimal Permissions:**
+  - Good use of permissions, but consider limiting `pull-requests: write` and `issues: write` to only what is needed.
+
+- **Step Naming:**
+  - Steps are clearly named, which improves readability.
+
+- **Fetch Depth:**
+  - Using `fetch-depth: 0` ensures full history, which is good for code review bots.
+
+- **Environment Variables:**
+  - Use environment variables for secrets and configuration.
+
+---
+
+### 4. Security Concerns
+
+- **Secrets Exposure:**
+  - Ensure that secrets are not logged or exposed in any output.
+  - Avoid echoing secret values in any script.
+
+- **GitHub Token Usage:**
+  - Only use the token for posting comments. Avoid using it for other operations unless necessary.
+
+- **Azure OpenAI Credentials:**
+  - Make sure the credentials are rotated regularly and have minimal privileges.
+
+---
+
+### 5. Maintainability & Readability
+
+- **Comments:**
+  - Add comments explaining complex conditions, especially the `if:` logic at the job level.
+
+- **Parameterization:**
+  - Parameterize values that may change (bot mention, API version, etc.).
+
+- **Error Handling:**
+  - Add error handling for missing files, failed steps, or empty outputs.
+
+---
+
+## Summary of Actionable Feedback
+
+1. **Fix PR Number Extraction:**  
+   Replace the `||` syntax with a shell step to set the PR number as an environment variable, then reference it in the Python command.
+
+2. **Parameterize Bot Mention:**  
+   Define the bot mention as a variable for easier updates.
+
+3. **Add Error Handling:**  
+   In the `Post review result` step, handle cases where the review output is missing or empty.
+
+4. **Add Comments:**  
+   Explain the job-level `if:` condition for future maintainers.
+
+5. **Limit Permissions:**  
+   Review and minimize permissions for security.
+
+6. **Check for Missing Dependencies:**  
+   Add checks or fallback for missing `requirements.txt`.
+
+---
+
+**Example Fix for PR Number Extraction:**
+```yaml
+- name: Set PR number
+  run: |
+    if [ "${{ github.event_name }}" = "pull_request" ]; then
+      echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+    else
+      echo "PR_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
+    fi
+
+- name: Run code review
+  env:
+    ...
+  run: |
+    python -m bot.main \
+      --repo "${{ github.repository }}" \
+      --pr-number "${{ env.PR_NUMBER }}"
+```
+
+---
+
+**Overall:**  
+The workflow is well-structured and follows good practices, but fixing the PR number extraction, adding error handling, and parameterizing values will improve reliability, maintainability, and security.
+
+---
+
+### 📄 `CONTRIBUTING.md`
+*Changes: +160 -0*
+
+**PR Review for CONTRIBUTING.md**
+
+Thank you for adding a comprehensive CONTRIBUTING.md! This is a valuable addition that will help onboard new contributors and maintain code quality. Below are my review comments, organized by the requested areas:
+
+---
+
+### 1. Issues or Bugs
+
+- **Test Command Consistency:**  
+  The instructions use `pytest tests/` as the main test command, but do not specify if a `pytest.ini` or similar config is present. If test discovery relies on a different pattern, clarify this to avoid confusion.
+
+- **Windows Virtualenv Activation:**  
+  The line  
+  ```
+  source venv/bin/activate  # On Windows: venv\Scripts\activate
+  ```
+  is correct, but for clarity and copy-paste friendliness, consider separating the Windows command onto its own line.
+
+- **Coverage Tool:**  
+  The command  
+  ```
+  pytest tests/ --cov=bot --cov-report=html
+  ```
+  assumes `pytest-cov` is installed, but it's not listed in the install instructions. Add `pytest-cov` to the development dependencies.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Pre-commit Hooks:**  
+  Suggest using pre-commit hooks for formatting and linting (e.g., black, flake8) to automate code style enforcement before commits.
+
+- **Branch Naming Convention:**  
+  Recommend a consistent branch naming convention (e.g., `feature/`, `bugfix/`, `chore/`) and document it explicitly.
+
+- **Commit Message Guidelines:**  
+  Add a section on writing clear, descriptive commit messages (e.g., referencing issues, using imperative mood).
+
+- **Pull Request Checklist:**  
+  Consider providing a checklist template for PRs (e.g., "[] Tests added/updated", "[] Documentation updated").
+
+- **Testing Matrix:**  
+  If the project supports multiple Python versions or OSes, mention how to test across them (e.g., via tox or GitHub Actions).
+
+- **Sensitive Data Reminder:**  
+  Under "Reporting Bugs," you mention sanitizing sensitive data. Consider emphasizing this further, e.g., "Never share API keys, tokens, or secrets in issues or PRs."
+
+- **Code Review Process:**  
+  Briefly describe how code reviews are conducted and what contributors can expect after submitting a PR.
+
+---
+
+### 3. Best Practices
+
+- **Docstrings:**  
+  Good call on requiring docstrings for public functions/classes. Recommend specifying the preferred docstring style (e.g., Google, NumPy, or reStructuredText).
+
+- **Type Annotations:**  
+  Since `mypy` is used, encourage contributors to add/maintain type annotations for all new/modified functions.
+
+- **Test Granularity:**  
+  Encourage writing small, focused tests (unit over integration, where possible) and using mocks for external dependencies.
+
+- **Dependency Management:**  
+  Recommend using a `requirements-dev.txt` or similar for development dependencies, and documenting this in the setup instructions.
+
+---
+
+### 4. Security Concerns
+
+- **Secrets in Code/Config:**  
+  Remind contributors never to commit secrets, credentials, or sensitive configuration files. Consider adding a `.gitignore` snippet for common secret/config files.
+
+- **Third-party Dependencies:**  
+  Suggest running `pip list --outdated` or using tools like `pip-audit` to check for vulnerable dependencies, especially before releases.
+
+- **License Compliance:**  
+  The license section is clear, but also remind contributors not to submit code they do not have the right to license under MIT.
+
+---
+
+### Minor Editorial Suggestions
+
+- **Formatting:**  
+  Use consistent Markdown heading levels (e.g., `##` for main sections, `###` for subsections).
+
+- **Link to Main Files:**  
+  Where you reference files (e.g., `bot/azure_openai_client.py`), consider linking to them in the repo for easier navigation.
+
+---
+
+## Summary
+
+Overall, this is a strong and well-structured CONTRIBUTING.md. Addressing the above points will further improve clarity, security, and maintainability for all contributors.
+
+**Action Items:**
+- Add `pytest-cov` to dev dependencies.
+- Clarify Windows virtualenv activation.
+- Suggest pre-commit hooks and branch naming conventions.
+- Add commit message and PR checklist guidelines.
+- Emphasize sensitive data handling.
+- Recommend type annotations and docstring style.
+- Remind contributors about secrets and dependency security.
+
+Let me know if you need sample text for any of these suggestions!
+
+---
+
+### 📄 `LICENSE`
+*Changes: +21 -0*
+
+**Code Review for LICENSE File (MIT License Addition)**
+
+---
+
+### 1. Issues or Bugs
+
+- **Year Discrepancy:** The copyright year is set to 2026. If this project is being released or worked on in 2024, the year should reflect the current year or the actual year of first publication.
+- **Contributor Attribution:** The copyright holder is listed as "UiPath Code Reviewer Bot Contributors." Ensure this accurately reflects the intended copyright holders (e.g., organization, individual authors, or a more formal contributor list).
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Year Correction:** Update the copyright year to the current year (e.g., 2024) unless there is a specific reason for using 2026.
+- **Contributor Clarity:** If "Contributors" is used, consider specifying how contributors are defined (e.g., those listed in a CONTRIBUTORS file, or all commit authors). Alternatively, use a more standard attribution such as an organization or individual name.
+- **License File Placement:** Ensure the LICENSE file is placed at the root of the repository for maximum visibility and compliance with open source best practices.
+
+---
+
+### 3. Best Practices
+
+- **Standard License Text:** The MIT License text appears standard and unmodified, which is good. Avoid altering the license text to ensure legal clarity.
+- **License Reference:** Consider referencing the license in your README and/or within the codebase (e.g., header comments in scripts) for additional clarity.
+- **Contributor Agreement:** If using "Contributors," ensure you have a clear contributor agreement or CLA (Contributor License Agreement) in place.
+
+---
+
+### 4. Security Concerns
+
+- **No Security Issues:** The LICENSE file itself does not introduce any security concerns. However, ensure that the license choice aligns with your intended use and distribution, especially if integrating third-party components with different licenses.
+
+---
+
+**Actionable Feedback:**
+
+- [ ] Update the copyright year to reflect the actual year of publication (e.g., 2024).
+- [ ] Clarify the attribution for copyright holders if "Contributors" is used.
+- [ ] Ensure the LICENSE file is at the repository root and referenced in documentation.
+- [ ] Maintain the standard MIT License text without modifications.
+
+---
+
+**Summary:**  
+The addition of the MIT License is a positive step for open source compliance and transparency. Please review the year and attribution for accuracy and clarity. No bugs or security issues are present in the license file itself.
+
+---
+
+If you have questions about licensing or contributor agreements, feel free to ask for further guidance.
+
+---
+
+### 📄 `QUICKSTART.md`
+*Changes: +141 -0*
+
+**PR Review for QUICKSTART.md**
+
+Thank you for adding the new `QUICKSTART.md` guide! This is a well-written, user-friendly document that will help users get started quickly. Below are my detailed comments and suggestions:
+
+---
+
+### 1. Issues or Bugs Identified
+
+- **Missing Step for GitHub Token in Local Testing:**  
+  While you mention how to set up the GitHub token in the environment file, you don't explicitly state that the token is required for local testing (Step 3). Some users may try to run the bot locally without setting the `GITHUB_TOKEN` and encounter authentication errors.  
+  **Action:** Add a note in Step 3 that the GitHub token must be present in `.env` for local testing.
+
+- **GitHub Actions Secrets Incomplete:**  
+  In Step 4, you list the Azure OpenAI secrets but omit `GITHUB_TOKEN`, which is required for the bot to comment on PRs when running in GitHub Actions.  
+  **Action:** Add `GITHUB_TOKEN` to the list of secrets to add in GitHub Actions.
+
+- **Potential Confusion with `--repo` Argument:**  
+  The usage examples use `--repo owner/repo`, but it's not clear if this should be the full GitHub URL or just `owner/repo`.  
+  **Action:** Clarify the expected format for the `--repo` argument (e.g., `octocat/Hello-World`).
+
+- **No Mention of Python Virtual Environment:**  
+  For best practices, it's recommended to use a Python virtual environment to avoid dependency conflicts.  
+  **Action:** Suggest using `python -m venv venv` and activating it before installing requirements.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Link to Requirements:**  
+  In the prerequisites, you mention "Python 3.8+" but do not specify if there are any OS-specific requirements or if Windows, macOS, and Linux are supported.  
+  **Action:** Add a note about supported operating systems if relevant.
+
+- **Clarify "Test Locally" Step:**  
+  The `--no-post` flag is used for dry runs, but some users may not understand what "without posting comments" means.  
+  **Action:** Briefly explain that this will simulate the review and print output to the console without posting to GitHub.
+
+- **Explicitly Mention Where to Place `.env`:**  
+  While it's implied, clarify that `.env` should be in the project root.
+
+- **Add a "Cleanup" Step:**  
+  Suggest how to deactivate the virtual environment or remove local files if the user wants to uninstall later.
+
+- **Add a Note on API Key Security:**  
+  Remind users not to commit their `.env` files or API keys to version control.
+
+---
+
+### 3. Best Practices
+
+- **Environment Variables:**  
+  Good job using `.env` for secrets. Remind users to add `.env` to `.gitignore` if not already present.
+
+- **Documentation Links:**  
+  You provide helpful links to further documentation and issue reporting—this is excellent.
+
+- **Command Examples:**  
+  The command examples are clear and cover common use cases.
+
+---
+
+### 4. Security Concerns
+
+- **Sensitive Data Exposure:**  
+  As above, remind users never to commit `.env` files or API keys. Consider adding a warning box or bolded note.
+
+- **GitHub Token Scope:**  
+  You mention using the `repo` scope, which is appropriate, but also note that the token should be kept secret and not shared.
+
+- **Azure OpenAI Key:**  
+  Remind users to treat their Azure OpenAI API key like a password.
+
+---
+
+### Example Edits
+
+Here are some suggested edits to improve clarity and security:
+
+```markdown
+> **⚠️ Security Note:**  
+> Never commit your `.env` file or API keys to version control. Ensure `.env` is listed in your `.gitignore`.
+
+## Step 1: Clone and Install (2 minutes)
+
+```bash
+git clone https://github.com/kangtamo/uipath-code-reviewer.git
+cd uipath-code-reviewer
+python -m venv venv
+source venv/bin/activate  # On Windows use: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+## Step 2: Configure Environment (2 minutes)
+
+Copy the example environment file to the project root:
+...
+
+## Step 3: Test Locally (1 minute)
+
+> **Note:** Ensure your `.env` contains a valid `GITHUB_TOKEN` with `repo` scope.
+
+Test the bot locally (dry run, does not post to GitHub):
+...
+
+## Step 4: Set Up GitHub Actions (Optional)
+
+...
+3. Add these secrets:
+   - `AZURE_OPENAI_ENDPOINT`
+   - `AZURE_OPENAI_API_KEY`
+   - `AZURE_OPENAI_DEPLOYMENT_NAME`
+   - `GITHUB_TOKEN`  <!-- Add this line -->
+
+...
+```
+
+---
+
+## Summary Table
+
+| Area                | Issue / Suggestion                                                                 |
+|---------------------|------------------------------------------------------------------------------------|
+| Bugs                | Missing `GITHUB_TOKEN` in Actions, not mentioning it for local test                |
+| Clarity             | Specify `--repo` format, explain dry run, add OS support note                      |
+| Best Practices      | Recommend virtual environment, add `.env` to `.gitignore`                          |
+| Security            | Warn about not committing secrets, clarify token/key handling                      |
+
+---
+
+**Thank you for your contribution! Addressing these points will make onboarding smoother and improve security for new users.**
+
+---
+
+### 📄 `README.md`
+*Changes: +233 -1*
+
+**UiPath Code Reviewer Bot README.md – Code Review**
+
+---
+
+### 1. Issues & Bugs
+
+- **Missing Newline at End of File:**  
+  The file does not end with a newline (`\ No newline at end of file`). This is a minor issue but is considered a best practice for compatibility with various tools and editors.
+
+- **Potential Broken Links:**  
+  - The links to `QUICKSTART.md`, `TOKEN_HELP.md`, and `docs/TOKEN_SETUP.md` assume these files exist. If they are missing or not committed, users will encounter 404 errors.
+  - The troubleshooting guide references `docs/TOKEN_SETUP.md#troubleshooting`. Ensure this anchor exists in the referenced file.
+
+- **Ambiguity in GitHub Token Setup:**  
+  The instructions mention both Personal Access Token and GitHub App, but do not clarify which is preferred or required for different use cases. This could confuse users.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Add a Newline at End of File:**  
+  Add a newline at the end of the README.md for consistency and compatibility.
+
+- **Clarify Token Setup:**  
+  Specify when to use a Personal Access Token vs. GitHub App, and highlight the recommended approach for GitHub Actions.
+
+- **Explicitly Mention Supported Python Versions:**  
+  The prerequisite says "Python 3.8 or higher." Consider specifying tested versions (e.g., "Tested with Python 3.8–3.11") for clarity.
+
+- **Expand Security Section:**  
+  While you mention not to commit `.env` files and to use GitHub Secrets, consider adding a note about rotating API keys and tokens regularly, and monitoring for unauthorized access.
+
+- **Add Example Output:**  
+  Including a sample of the bot’s review output (comment or file) would help users understand what to expect.
+
+- **Improve Troubleshooting Formatting:**  
+  Use bullet points or tables for common issues and solutions to enhance readability.
+
+- **Add Badge(s) for Status:**  
+  Consider adding badges (build status, license, etc.) at the top for quick visibility.
+
+- **Contribution Guidelines:**  
+  Add a link to a `CONTRIBUTING.md` if available, or briefly outline contribution steps.
+
+---
+
+### 3. Best Practices
+
+- **Sensitive Data Handling:**  
+  You correctly advise against committing `.env` files and using GitHub Secrets. Consider also recommending `.gitignore` for `.env` and similar files.
+
+- **Documentation Structure:**  
+  The README is well-structured and covers setup, usage, and troubleshooting. Good use of sections and code blocks.
+
+- **Explicit Permissions:**  
+  The workflow permissions are clearly listed, which is excellent for transparency.
+
+---
+
+### 4. Security Concerns
+
+- **API Key Exposure:**  
+  Remind users to never share screenshots or logs containing API keys or tokens.
+
+- **Least Privilege Principle:**  
+  Encourage users to scope GitHub tokens as narrowly as possible (e.g., `public_repo` for public repos).
+
+- **Azure OpenAI API Key Rotation:**  
+  Suggest regular rotation of Azure OpenAI API keys and monitoring usage.
+
+- **Dependency Management:**  
+  Recommend reviewing dependencies in `requirements.txt` for vulnerabilities (e.g., using `pip-audit`).
+
+---
+
+### Actionable Summary
+
+1. **Add a newline at the end of the README.md file.**
+2. **Verify all referenced documentation files and anchors exist.**
+3. **Clarify token setup instructions and recommend best practices for GitHub Actions.**
+4. **Expand the security section with advice on key rotation and monitoring.**
+5. **Consider adding a sample bot review output for user clarity.**
+6. **Format troubleshooting with bullet points or tables for readability.**
+7. **Add `.env` to `.gitignore` and mention this in the README.**
+8. **Encourage dependency vulnerability scanning.**
+9. **Add badges and contribution guidelines for completeness.**
+
+---
+
+**Overall, this README.md is comprehensive and user-friendly. Addressing the above points will further improve clarity, security, and maintainability.**
+
+---
+
+### 📄 `TOKEN_HELP.md`
+*Changes: +177 -0*
+
+**UiPath Code Reviewer Feedback for `TOKEN_HELP.md`**
+
+---
+
+### 1. **Issues & Potential Bugs**
+
+- **Token Exposure Risk:**  
+  The instructions for adding the token to `.env` and using `export` are clear, but there is no explicit warning about keeping the token secure and never committing `.env` files or tokens to version control. This is a common mistake and should be emphasized.
+
+- **Ambiguous `.env` Example:**  
+  The `.env` example uses `ghp_your_token_here`. While this is a placeholder, some users may accidentally copy the actual token into the example file and commit it. Consider adding a warning or using a more explicit placeholder.
+
+- **Missing Verification Script Location:**  
+  The instructions reference `verify_token.py`, but do not specify where this script is located or how to obtain it. If it's not in the root directory, clarify its location.
+
+- **No Mention of Token Revocation:**  
+  There is no guidance on what to do if a token is accidentally exposed. Users should be advised to revoke compromised tokens immediately.
+
+---
+
+### 2. **Suggestions for Improvement**
+
+- **Add Security Warnings:**  
+  Add a clear warning box about never sharing, uploading, or committing tokens or `.env` files to public repositories.
+
+  > ⚠️ **Security Warning:**  
+  > Never commit your `.env` file or share your GitHub token. If your token is exposed, revoke it immediately at [GitHub Token Settings](https://github.com/settings/tokens).
+
+- **Clarify `.env` Handling:**  
+  Suggest adding `.env` to `.gitignore` if not already present, and link to `.gitignore` documentation.
+
+- **Explicit Script Location:**  
+  Specify where `verify_token.py` is located, or provide a download link if it's not included by default.
+
+- **Token Expiration Reminder:**  
+  Remind users to set an appropriate expiration for their tokens and to renew them as needed.
+
+- **Error Message Improvements:**  
+  For troubleshooting, suggest users check logs for more details and provide guidance on how to enable verbose/debug logging if available.
+
+---
+
+### 3. **Best Practices**
+
+- **Use Environment Variables:**  
+  Recommend using environment variables for sensitive data instead of hardcoding in scripts or config files.
+
+- **Principle of Least Privilege:**  
+  Encourage users to only grant the minimum required permissions (`repo` or `public_repo`) and avoid using tokens with broader scopes than necessary.
+
+- **Documentation Consistency:**  
+  Ensure all referenced documentation files exist and are up-to-date. Broken links can frustrate users.
+
+---
+
+### 4. **Security Concerns**
+
+- **Token Handling:**  
+  As above, emphasize secure handling of tokens. Consider adding a section on how to rotate tokens and monitor for unauthorized access.
+
+- **Sensitive Output:**  
+  Remind users not to paste tokens in issues or logs. If the verification script prints token info, ensure it masks or omits sensitive values.
+
+---
+
+### **Actionable Recommendations**
+
+1. **Add a prominent security warning** at the top and near `.env` instructions.
+2. **Clarify the location of `verify_token.py`** and ensure users know how to access it.
+3. **Advise users to add `.env` to `.gitignore`** and never commit it.
+4. **Include guidance on token revocation** if a token is exposed.
+5. **Review all documentation links** for accuracy and existence.
+6. **Encourage minimal permissions** for tokens and regular rotation.
+7. **Remind users to check logs** for troubleshooting and provide guidance on enabling debug output if available.
+
+---
+
+**Sample Security Warning Addition:**
+
+```markdown
+> ⚠️ **Security Warning:**  
+> Never share, upload, or commit your GitHub token or `.env` file to any repository. If your token is exposed, revoke it immediately at [GitHub Token Settings](https://github.com/settings/tokens).
+```
+
+---
+
+**Overall:**  
+The guide is clear and user-friendly, but would benefit from stronger security guidance and clarification around token/script handling. Addressing these points will improve user safety and reduce risk of accidental exposure.
+
+---
+
+### 📄 `bot/__init__.py`
+*Changes: +7 -0*
+
+**Code Review for `bot/__init__.py`**
+
+Thank you for adding the `__init__.py` file to the `bot` package. Here is a detailed review based on your changes:
+
+---
+
+### 1. Issues or Bugs Identified
+
+- **No functional code or imports:** The current file only contains a docstring and a `__version__` variable. This is acceptable for an initial package marker, but if you intend to expose any package-level functionality, consider importing relevant modules or classes here.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **PEP 8 Compliance:**  
+  - The docstring is well-formatted, but for multi-line docstrings, PEP 257 recommends that the summary line be followed by a blank line. Consider adding a blank line after the first summary line for clarity:
+    ```python
+    """
+    UiPath Code Reviewer Bot
+
+    A bot that uses Azure OpenAI to review UiPath automation code changes in pull requests.
+    """
+    ```
+- **Versioning:**  
+  - Defining `__version__` is a good practice. If you plan to distribute this package, consider adding a `__all__` variable to explicitly declare the public API of the package.
+
+- **Encoding Declaration:**  
+  - While not strictly necessary in Python 3, if you expect non-ASCII characters in your files, you may want to add an encoding declaration at the top:
+    ```python
+    # -*- coding: utf-8 -*-
+    ```
+
+---
+
+### 3. Best Practices
+
+- **Purpose of `__init__.py`:**  
+  - The main purpose of `__init__.py` is to mark a directory as a Python package. You can also use it to expose package-level variables, classes, or functions. If you have any commonly used functions or classes, consider importing them here for easier access.
+- **Docstring Use:**  
+  - Including a module-level docstring is a good practice for maintainability and documentation.
+
+---
+
+### 4. Security Concerns
+
+- **No security concerns identified:**  
+  - This file does not contain any executable code or sensitive information.
+
+---
+
+**Actionable Recommendations:**
+
+1. (Optional) Add a blank line after the docstring summary for PEP 257 compliance.
+2. (Optional) If you plan to expose a public API, consider adding a `__all__` variable.
+3. (Optional) If you expect non-ASCII content, add an encoding declaration at the top.
+4. No bugs or security issues found.
+
+---
+
+**Example Revised File:**
+```python
+# -*- coding: utf-8 -*-
+"""
+UiPath Code Reviewer Bot
+
+A bot that uses Azure OpenAI to review UiPath automation code changes in pull requests.
+"""
+
+__version__ = "0.1.0"
+```
+
+---
+
+Let me know if you have further questions or plan to expand this package’s functionality!
+
+---
+
+### 📄 `bot/azure_openai_client.py`
+*Changes: +149 -0*
+
+**Code Review for `bot/azure_openai_client.py`**
+
+---
+
+### 1. Issues or Bugs Identified
+
+- **Error Handling in `review_code`:**
+  - The method catches all exceptions and returns an error string as the result. This can mask real issues and makes it difficult for the caller to distinguish between a successful review and an error. It would be better to raise the exception or return a structured result (e.g., a tuple or custom object indicating success/failure).
+
+- **Hardcoded Default API Version:**
+  - The API version default is hardcoded as `"2024-02-15-preview"`. If Azure changes their API or this version is deprecated, the client may break silently. Consider making this more configurable or validating the version.
+
+- **Potential AttributeError:**
+  - The code assumes `response.choices[0].message.content` will always exist. If the API response structure changes or is malformed, this will raise an unhandled exception.
+
+- **No Input Validation for `diff` or `file_path`:**
+  - The `review_code` method does not validate that `diff` or `file_path` are non-empty strings. This could result in unclear prompts or errors from the API.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Improve Exception Handling:**
+  - Instead of returning an error string, consider logging the error and raising a custom exception or returning a structured error object.
+  - Example:
+    ```python
+    except Exception as e:
+        # log the error
+        raise AzureOpenAIClientError(f"Code review failed: {str(e)}")
+    ```
+
+- **Validate Inputs:**
+  - Add checks to ensure `diff` and `file_path` are provided and are not empty. Return a clear error if not.
+
+- **Response Validation:**
+  - Check if `response.choices` exists and has at least one element before accessing `[0].message.content`. Handle missing or malformed responses gracefully.
+
+- **Configurable Parameters:**
+  - Allow the caller to override `temperature` and `max_completion_tokens` if needed, either via constructor or method parameters.
+
+- **Separation of Concerns:**
+  - Consider separating prompt construction logic into a dedicated class or module, especially if prompts become more complex.
+
+- **Type Hints for Return Values:**
+  - Add type hints to all methods, especially `review_code`.
+
+---
+
+### 3. Best Practices
+
+- **Environment Variable Handling:**
+  - When reading from environment variables, consider using a configuration management library or centralizing config loading.
+
+- **Docstrings:**
+  - Good use of docstrings for methods. Consider using a consistent format (e.g., Google or NumPy style).
+
+- **Constants:**
+  - Move magic strings (like the API version or prompt templates) to module-level constants for easier maintenance.
+
+- **Logging:**
+  - Add logging for important events, such as initialization, API calls, and errors.
+
+---
+
+### 4. Security Concerns
+
+- **Sensitive Data in Exceptions:**
+  - Be careful not to log or return sensitive information (like API keys or endpoint URLs) in exception messages.
+
+- **Environment Variables:**
+  - Ensure that environment variables containing secrets are handled securely and not exposed in logs or error messages.
+
+- **Prompt Injection:**
+  - If `diff`, `file_path`, or `context` can be user-controlled, consider sanitizing inputs to prevent prompt injection attacks.
+
+---
+
+### 5. Maintainability and Readability
+
+- **Prompt Construction:**
+  - The prompt-building methods are clear and modular. Consider extracting prompt templates to separate files if they grow.
+
+- **Class Structure:**
+  - The class is well-structured and easy to understand.
+
+- **Method Length:**
+  - Methods are concise and focused on single responsibilities.
+
+---
+
+## Summary Table
+
+| Area                | Issue / Suggestion                                                                                  |
+|---------------------|----------------------------------------------------------------------------------------------------|
+| Error Handling      | Return structured errors or raise exceptions, not error strings.                                    |
+| Input Validation    | Validate `diff` and `file_path` inputs.                                                            |
+| Response Handling   | Check for existence of `choices` and `message` in API response.                                    |
+| Security            | Avoid leaking sensitive info in errors/logs; sanitize user inputs.                                 |
+| Configurability     | Allow temperature and token limits to be configurable.                                              |
+| Maintainability     | Consider extracting prompt templates and constants.                                                 |
+| Logging             | Add logging for key events and errors.                                                             |
+
+---
+
+## Example Improvements
+
+```python
+def review_code(self, diff: str, file_path: str, context: Optional[str] = None) -> str:
+    if not diff or not file_path:
+        raise ValueError("Both diff and file_path must be provided")
+    ...
+    try:
+        response = self.client.chat.completions.create(...)
+        if not response.choices or not hasattr(response.choices[0], 'message'):
+            raise RuntimeError("Malformed response from Azure OpenAI")
+        return response.choices[0].message.content
+    except Exception as e:
+        # log the error securely
+        raise AzureOpenAIClientError("Failed to review code") from e
+```
+
+---
+
+**Overall:**  
+The code is well-structured and readable, but would benefit from improved error handling, input validation, and security hardening. Addressing these points will make the client more robust, maintainable, and secure.
+
+---
+
+### 📄 `bot/github_client.py`
+*Changes: +175 -0*
+
+**Code Review for `bot/github_client.py`**
+
+Thank you for your contribution! Here is a detailed review of your code changes, focusing on code quality, potential issues, best practices, performance, security, and maintainability.
+
+---
+
+### 1. Issues / Bugs
+
+**a. Exception Handling and Error Reporting**
+- In `post_review_comment` and `post_issue_comment`, you catch `GithubException` and raise a generic `Exception` with the error message. This loses the original stack trace and exception type, which can make debugging harder. Consider either re-raising the original exception or using `raise ... from e` to preserve the context.
+- In `post_review_comment`, if both the issue comment and review creation fail, the error message may not clearly indicate which step failed.
+
+**b. Patch Attribute Handling**
+- In `get_pr_files` and `get_pr_diff`, you use `hasattr(file, 'patch')`. The PyGithub `PullRequestFile` object always has a `patch` attribute, but it may be `None`. The check is redundant and could be simplified.
+
+**c. Use of List for PR Files**
+- In `get_pr_files`, you return a list of dictionaries. Consider returning a more structured object or at least using a `TypedDict` for better type safety and maintainability.
+
+**d. Fallback Logic in `post_review_comment`**
+- The fallback to `create_review` only happens for 403 errors. There are other possible permission-related errors (e.g., 404, 401). Consider handling these as well, or at least documenting the limitation.
+
+**e. Use of `event` Parameter**
+- The `event` parameter in `post_review_comment` defaults to `"COMMENT"`, but you don't validate its value. If an invalid event is passed, the GitHub API will error. Consider validating the input.
+
+**f. Getting the Latest Commit**
+- In `post_review_comment`, you get the latest commit with `commits = list(pr.get_commits())` and then `commits[-1]`. This could be inefficient for very large PRs. Consider using `pr.get_commits().reversed[0]` if supported, or at least document the potential inefficiency.
+
+---
+
+### 2. Suggestions for Improvement
+
+**a. Type Annotations**
+- Add more precise type annotations, especially for return types. For example, `get_pr_files` returns `List[Dict[str, Any]]`, not just `List[Dict]`.
+
+**b. Docstrings**
+- Your docstrings are clear and follow a consistent style. Consider using [Google style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) or [NumPy style](https://numpydoc.readthedocs.io/en/latest/format.html) for even better clarity.
+
+**c. Logging**
+- Instead of raising generic exceptions, consider logging errors for better observability, especially if this is used in a bot context.
+
+**d. API Rate Limits**
+- Consider handling GitHub API rate limiting errors gracefully, possibly with retries or clearer error messages.
+
+**e. Optional: Caching**
+- If you expect to call `get_repository` or `get_pull_request` multiple times for the same repo/PR, consider caching the results to reduce API calls.
+
+---
+
+### 3. Best Practices
+
+**a. Secure Handling of Access Tokens**
+- Good job using environment variables for the token. Ensure that the token is never logged or exposed in error messages.
+
+**b. Dependency Management**
+- Ensure that `PyGithub` is pinned to a secure and compatible version in your requirements.
+
+**c. Input Validation**
+- Validate inputs where possible (e.g., check that `pr_number` is positive, `repo_full_name` is in the correct format).
+
+---
+
+### 4. Security Concerns
+
+**a. Token Handling**
+- As above, never log the token. Consider adding a warning in the docstring about keeping the token secure.
+
+**b. Injection Risks**
+- When posting comments, ensure that the `body` is not being constructed from untrusted user input without sanitization. While this is less of an issue for GitHub comments, it's a good practice to be aware of.
+
+**c. Exception Details**
+- Be careful not to expose sensitive information in exception messages, especially if these are surfaced to end users.
+
+---
+
+### 5. Maintainability & Readability
+
+**a. Method Length**
+- All methods are concise and focused—good job!
+
+**b. Reusability**
+- Consider extracting repeated logic (e.g., getting PR objects) into helper methods if this class grows.
+
+**c. Imports**
+- Only import what you use. For example, if you don't use `List` or `Dict` elsewhere, import them only where needed.
+
+---
+
+### 6. Minor / Style
+
+- Consider using f-strings consistently for error messages.
+- You might want to add a `__str__` or `__repr__` method to the class for easier debugging.
+
+---
+
+## Summary Table
+
+| Area                | Issue / Suggestion                                                                                 | Actionable Recommendation                                       |
+|---------------------|----------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|
+| Exception Handling  | Generic exceptions lose context                                                                    | Use `raise ... from e` or re-raise original exception           |
+| Patch Attribute     | Redundant `hasattr` check                                                                          | Use `if file.patch:` directly                                   |
+| Input Validation    | No validation for `event` parameter in `post_review_comment`                                       | Validate event value                                            |
+| Performance         | Inefficient way to get latest commit                                                               | Use more efficient method if possible                           |
+| Security            | Ensure token is never logged or exposed                                                            | Add docstring warning, audit logging                            |
+| API Rate Limiting   | No handling of rate limits                                                                         | Add handling or documentation                                   |
+| Type Annotations    | Could be more precise                                                                              | Use `List[Dict[str, Any]]` etc.                                 |
+| Logging             | No logging for failures                                                                            | Add logging where exceptions are caught                         |
+
+---
+
+## Example Fixes
+
+**Exception Handling Example:**
+```python
+try:
+    pr.create_issue_comment(body)
+except GithubException as e:
+    logger.error(f"Failed to post issue comment: {e}")
+    raise
+```
+
+**Patch Attribute Example:**
+```python
+if file.patch:
+    # ...
+```
+
+**Event Validation Example:**
+```python
+if event not in {"COMMENT", "APPROVE", "REQUEST_CHANGES"}:
+    raise ValueError(f"Invalid review event: {event}")
+```
+
+---
+
+## Overall
+
+This is a solid and well-structured integration layer for GitHub. Addressing the above points will improve robustness, maintainability, and security. Let me know if you have any questions or would like help with specific changes!
+
+---
+
+### 📄 `bot/main.py`
+*Changes: +101 -0*
+
+**Code Review for bot/main.py**
+
+Thank you for your submission! Below is a detailed review of your code changes, focusing on code quality, potential issues, best practices, performance, security, and maintainability.
+
+---
+
+### 1. Issues & Bugs
+
+- **Relative Import (`from .reviewer import CodeReviewer`)**
+  - If this script is intended to be run as a standalone module (e.g., `python bot/main.py`), the relative import will fail with `ImportError: attempted relative import with no known parent package`. Consider using an absolute import (`from reviewer import CodeReviewer`) or ensuring the script is always invoked as part of a package (e.g., `python -m bot.main`).
+
+- **Hardcoded Output File**
+  - The default output file is set to `'review_result.txt'` and will be created in the current working directory. If the script is run from a directory without write permissions, this will raise an exception. Consider handling file write exceptions gracefully.
+
+- **Error Handling Granularity**
+  - The `except Exception as e` block is too broad. While it's good to catch unexpected errors, consider catching more specific exceptions (e.g., `IOError` for file operations, `ImportError` for module issues) to provide more actionable error messages.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Logging Instead of Print Statements**
+  - Replace `print` statements with the `logging` module. This provides more flexibility and control over log levels and output destinations, especially for production or CI/CD environments.
+
+- **Environment Variable Validation**
+  - The script validates environment variables at runtime, which is good. However, consider providing a `.env.example` file in your repo to help users set up their environment.
+
+- **Command-Line Argument Validation**
+  - You might want to add additional validation for the `--repo` argument (e.g., ensure it matches the expected `owner/repo` format).
+
+- **Graceful File Write**
+  - When writing the review result to a file, wrap the operation in a try-except block to handle permissions or disk errors, and provide a meaningful error message.
+
+- **Function Extraction**
+  - The main function is getting a bit long. Consider extracting environment validation and argument parsing into separate helper functions for better readability and testability.
+
+---
+
+### 3. Best Practices
+
+- **Shebang and Encoding**
+  - For scripts intended to be run directly, add a shebang line (`#!/usr/bin/env python3`) at the top, and optionally specify encoding (`# -*- coding: utf-8 -*-`).
+
+- **Docstrings**
+  - Good use of module and function docstrings! Consider expanding the docstring to include usage examples.
+
+- **Exit Codes**
+  - Good practice using exit codes to indicate success or failure.
+
+- **Type Hints**
+  - Consider adding type hints to function definitions for better readability and tooling support.
+
+---
+
+### 4. Security Concerns
+
+- **Sensitive Information in Output**
+  - Ensure that no sensitive information (e.g., API keys, tokens) is ever written to logs or output files. The current script does not, but be cautious if you expand logging.
+
+- **Environment Variables Exposure**
+  - When printing missing environment variables, you only print the variable names, not their values, which is good. Continue to avoid printing actual secrets.
+
+- **File Overwrite**
+  - The script overwrites the output file without warning. If this file contains sensitive or important information, consider warning the user or requiring confirmation.
+
+---
+
+### 5. Minor/Style Suggestions
+
+- **Consistent String Formatting**
+  - Consider using f-strings consistently for all formatted output.
+
+- **Constants**
+  - Move the list of required environment variables to a module-level constant for clarity.
+
+---
+
+## Example Improvements
+
+```python
+import logging
+
+# At the top of your script
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+
+def validate_env_vars(required_vars):
+    missing = [var for var in required_vars if not os.getenv(var)]
+    if missing:
+        logging.error(f"Missing required environment variables: {', '.join(missing)}")
+        sys.exit(1)
+```
+
+---
+
+## Summary Table
+
+| Area            | Feedback                                                                                 |
+|-----------------|------------------------------------------------------------------------------------------|
+| Imports         | Use absolute imports or ensure package execution.                                         |
+| Logging         | Use `logging` instead of `print`.                                                        |
+| Error Handling  | Catch specific exceptions where possible.                                                 |
+| File Output     | Handle file write errors gracefully.                                                      |
+| Security        | Do not print or log sensitive values.                                                     |
+| Structure       | Consider extracting logic into helper functions.                                          |
+| Type Hints      | Add type hints for better readability.                                                    |
+
+---
+
+**Action Items:**
+
+1. Fix the relative import for `CodeReviewer`.
+2. Replace `print` with `logging`.
+3. Add error handling for file output.
+4. Consider splitting up the main function.
+5. Optionally, add type hints and a shebang line.
+
+Let me know if you need code samples for any of these suggestions!
+
+---
+
+### 📄 `bot/reviewer.py`
+*Changes: +181 -0*
+
+**Code Review for `bot/reviewer.py`**
+
+Thank you for submitting your code for review. Below is detailed feedback focused on code quality, potential issues, best practices, performance, security, and maintainability.
+
+---
+
+### 1. Issues and Bugs
+
+**a. Potential KeyError on File Dicts**
+- In several places (e.g., `file['patch']`, `file['additions']`, `file['deletions']`, `file['filename']`), you access dictionary keys directly. If any of these keys are missing, it will raise a `KeyError`.
+  - **Action:** Use `.get()` with a default value or add validation to ensure these keys exist before accessing.
+
+**b. Patch Presence Check**
+- The check `if file['patch']:` will skip files where `patch` is an empty string or `None`. However, if the API returns `patch` as `None` for binary files or certain changes, this may skip files that should be reviewed.
+  - **Action:** Consider explicitly checking for `None` or document this behavior.
+
+**c. Filtering Logic May Miss Some UiPath Files**
+- The `_filter_uipath_files` method uses both extension and pattern matching, but the pattern list includes generic terms like `'workflow'` which may match unintended files.
+  - **Action:** Make the pattern list more precise or consider using regex for more robust matching.
+
+---
+
+### 2. Suggestions for Improvement
+
+**a. Dependency Injection and Testability**
+- The constructor supports dependency injection for clients, which is good. Consider adding type hints for the constructor parameters for clarity.
+
+**b. Logging and Error Handling**
+- Currently, errors are only caught and returned in the result dict. Consider adding logging (using Python's `logging` module) for better observability and debugging.
+
+**c. Magic Strings**
+- Strings like `"COMMENT"`, file extensions, and patterns are hardcoded in multiple places.
+  - **Action:** Define these as class-level constants for easier maintenance and to avoid typos.
+
+**d. Docstrings**
+- The docstrings are clear and helpful. Consider adding parameter and return types in the docstrings for better auto-documentation.
+
+**e. Performance**
+- The code reviews each file sequentially. If reviewing many files, this could be slow (especially if `AzureOpenAIClient.review_code` is a network call).
+  - **Action:** Consider parallelizing the file review step using `concurrent.futures.ThreadPoolExecutor` or similar.
+
+---
+
+### 3. Best Practices
+
+**a. Type Hints**
+- Most methods have type hints, but some (like the constructor) could be more explicit.
+
+**b. Separation of Concerns**
+- The class is well-structured, with clear separation between filtering, reviewing, and compiling the review.
+
+**c. Return Consistency**
+- The method `review_pull_request` always returns a dictionary, which is good for consistency.
+
+---
+
+### 4. Security Concerns
+
+**a. Injection Risks**
+- If user-supplied data (e.g., PR comments or file contents) is passed to external services (like Azure OpenAI), ensure proper sanitization and validation to prevent prompt injection or other attacks.
+
+**b. Exception Handling**
+- Catching broad `Exception` is sometimes necessary, but be careful not to swallow critical errors. Consider catching more specific exceptions where possible.
+
+**c. Sensitive Data Exposure**
+- Ensure that error messages (e.g., `str(e)`) do not leak sensitive information, especially if they are posted as PR comments.
+
+---
+
+### 5. Maintainability and Readability
+
+**a. Code Structure**
+- The code is modular and readable. Good use of helper methods.
+
+**b. Inline Comments**
+- Consider adding more inline comments, especially in more complex logic sections (e.g., file filtering).
+
+**c. Test Coverage**
+- Ensure there are unit tests for edge cases, such as PRs with no files, only non-UiPath files, or files with missing keys.
+
+---
+
+## Summary of Actionable Feedback
+
+1. **Use `.get()` or validate keys when accessing dict values from the GitHub API.**
+2. **Refine the UiPath file filtering logic to avoid false positives/negatives.**
+3. **Extract magic strings and lists to class-level constants.**
+4. **Add logging for errors and important events.**
+5. **Consider parallelizing file reviews for performance.**
+6. **Be cautious with exception handling and avoid leaking sensitive data in error messages.**
+7. **Add type hints to all method parameters and returns.**
+8. **Review and expand test coverage for edge cases.**
+
+Let me know if you would like code snippets or further clarification on any of these points!
+
+---
+
+### 📄 `docs/CONFIGURATION.md`
+*Changes: +286 -0*
+
+**PR Review: Configuration Guide (docs/CONFIGURATION.md)**
+
+Thank you for providing this comprehensive configuration guide! Below is a detailed review focusing on issues, suggestions, best practices, and security considerations.
+
+---
+
+## 1. Issues / Bugs Identified
+
+- **Hardcoded API Version Reference:**  
+  The guide references `2024-02-15-preview` as the default API version in several places. If the codebase changes the default or supports multiple versions, this could become outdated. Consider referencing a variable or noting where the default is set in code.
+
+- **Potential for Leaked Secrets:**  
+  The `.env` example includes real-looking variable names. While you note not to commit `.env` files, some users might copy-paste this into their repo. Consider adding a warning above the code block:  
+  > ⚠️ **Never commit this file to your repository!**
+
+- **Ambiguity in GitHub Token Usage:**  
+  The guide says "`GITHUB_TOKEN` is automatically provided by GitHub Actions and doesn't need to be added."  
+  - This is true for Actions, but for local testing, users must create their own token.  
+  - Make it clearer that the `GITHUB_TOKEN` environment variable is required for local runs, but not for Actions.
+
+- **No Mention of .env File Location in GitHub Actions:**  
+  The guide instructs users to create a `.env` file, but for GitHub Actions, secrets are injected as environment variables, not via `.env`. Clarify that `.env` is for local development only.
+
+- **Token Scopes and Permissions:**  
+  The guide suggests `repo` or `public_repo` scope for PATs. For private repos, `repo` is required, but for public, `public_repo` is sufficient. However, if the bot needs to comment on issues or PRs, the `write:discussion` or `write:issues` scopes might be needed. Double-check the minimum required scopes and clarify.
+
+- **Potential for Outdated Links:**  
+  The guide links to [TOKEN_SETUP.md](TOKEN_SETUP.md). If this file is moved or renamed, the link will break. Consider using relative links or referencing the file location in the repo.
+
+---
+
+## 2. Suggestions for Improvement
+
+- **Explicitly List All Required Environment Variables:**  
+  Consider adding a summary table listing all required and optional environment variables, their descriptions, and whether they're needed for local/dev/CI.
+
+- **Clarify Local vs CI/CD Configuration:**  
+  Add a section or callout that distinguishes between local development and GitHub Actions configuration, especially regarding secrets and environment variable management.
+
+- **Add Example for GitHub App Authentication:**  
+  The GitHub App setup section mentions generating a private key and using it to generate installation tokens, but does not provide an example or reference for how to do this. Consider linking to [GitHub's official docs](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app) or providing a code snippet.
+
+- **Add .env.example Template:**  
+  Recommend including a `.env.example` file in the repo (with placeholder values) to help users set up their environment variables correctly.
+
+- **Highlight Security Warnings:**  
+  Use blockquotes or callouts for security warnings, especially around using `pull_request_target` and handling secrets.
+
+- **Add Section on Rotating and Revoking Tokens:**  
+  Briefly explain how to rotate or revoke tokens, and what to do if a token is accidentally exposed.
+
+- **Mention Logging and Monitoring:**  
+  Suggest enabling logging (if supported by the bot) and monitoring usage both for Azure OpenAI and GitHub API to detect abuse or unexpected costs.
+
+- **Add Troubleshooting for Common YAML Errors:**  
+  Since many issues arise from YAML formatting in GitHub Actions, consider adding a note about checking for indentation and syntax errors.
+
+---
+
+## 3. Best Practices
+
+- **Principle of Least Privilege:**  
+  Emphasize using the minimum required permissions for both Azure and GitHub tokens.
+
+- **Environment Segregation:**  
+  Recommend using separate credentials for development, staging, and production.
+
+- **Secret Management:**  
+  Encourage using GitHub Actions secrets and never hardcoding secrets in code or workflow files.
+
+- **Documentation Maintenance:**  
+  Suggest versioning or dating the configuration guide, especially as API versions and best practices change.
+
+---
+
+## 4. Security Concerns
+
+- **Handling of Secrets:**  
+  The guide is clear about not committing `.env` files, but reiterate that secrets should never be logged or output in CI/CD logs.
+
+- **Use of `pull_request_target`:**  
+  The warning is good, but consider making it even more prominent. This event can be dangerous if not handled correctly.
+
+- **Token Permissions:**  
+  Double-check that the recommended token scopes are the minimum necessary. Overly broad tokens are a risk.
+
+- **Azure OpenAI Key Exposure:**  
+  Remind users to treat Azure OpenAI keys as sensitive as any other API key.
+
+---
+
+## 5. Minor / Editorial
+
+- **Formatting:**  
+  - Use consistent capitalization for headings.
+  - Consider using callouts for important notes (`> Note: ...` or `> ⚠️ Warning: ...`).
+  - Use bullet points for lists of steps for easier readability.
+
+- **Typos/Grammar:**  
+  - "Let your team know this is a tool, not a replacement for human review" → "Let your team know this is a tool, not a replacement for human reviewers."
+  - "AI isn't perfect, verify suggestions" → "AI isn't perfect; always verify its suggestions."
+
+---
+
+## 6. Example Improvements
+
+**Add a warning above the .env code block:**
+```markdown
+> ⚠️ **Never commit your `.env` file or secrets to version control.**
+```
+
+**Add a table summarizing environment variables:**
+| Variable | Required | Description | Used In |
+|----------|----------|-------------|---------|
+| AZURE_OPENAI_ENDPOINT | Yes | Azure OpenAI endpoint URL | Local, Actions |
+| AZURE_OPENAI_API_KEY | Yes | Azure OpenAI API key | Local, Actions |
+| AZURE_OPENAI_DEPLOYMENT_NAME | Yes | Model deployment name | Local, Actions |
+| AZURE_OPENAI_API_VERSION | No | API version (default: 2024-02-15-preview) | Local, Actions |
+| GITHUB_TOKEN | Yes (local) | GitHub token for API access | Local |
+
+---
+
+## Summary
+
+**Overall, this is a well-written and thorough configuration guide.**  
+Addressing the above points will improve clarity, security, and user experience, and help prevent common setup mistakes.
+
+Let me know if you have any questions or would like help drafting the suggested changes!
+
+---
+
+### 📄 `docs/TOKEN_SETUP.md`
+*Changes: +390 -0*
+
+**PR Review for `docs/TOKEN_SETUP.md`**
+
+Thank you for contributing this comprehensive token setup guide! The documentation is clear and covers most scenarios users will encounter. Below are some suggestions and observations to further improve quality, security, and maintainability:
+
+---
+
+### 1. Issues & Bugs
+
+- **Token Scope Table**:  
+  The table under "Required Permissions" lists `pull-requests: write` and `issues: write` as scopes. These are not actual GitHub PAT scopes—they are permissions for the GITHUB_TOKEN in Actions workflows. For PATs, only `repo` (or `public_repo`) is relevant. This could confuse users.  
+  **Action:** Clarify that these are workflow permissions, not PAT scopes.
+
+- **Token Generation Instructions**:  
+  The guide instructs users to use "Tokens (classic)". GitHub is deprecating classic tokens in favor of fine-grained PATs. Consider mentioning fine-grained tokens and their scopes, or at least note the deprecation and link to GitHub’s documentation.  
+  **Action:** Add a note about fine-grained tokens and update instructions if possible.
+
+- **.env File Location**:  
+  The guide says to add the token to `.env` but does not specify the expected location (root of the repo?).  
+  **Action:** Explicitly state where `.env` should be placed.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Security Warnings**:  
+  The security note about not committing `.env` is good. Consider adding a warning to never paste tokens into GitHub issues, PRs, or public forums.
+
+- **Token Exposure in Examples**:  
+  In the curl example, the token is shown in the command. Remind users to be careful with shell history and not to share these commands.  
+  **Action:** Add a caution about shell history and using `env` or a temporary variable.
+
+- **Token Rotation**:  
+  You mention rotating tokens but not how to update them in the `.env` file or GitHub Actions.  
+  **Action:** Add a line about updating the token in all relevant places after rotation.
+
+- **Consistency in Terminology**:  
+  Sometimes you use "PAT", sometimes "token", sometimes "GITHUB_TOKEN". Consider a glossary or a short section clarifying the difference between:
+    - GitHub Actions' `GITHUB_TOKEN`
+    - Personal Access Token (PAT)
+    - Fine-grained PAT
+
+- **Verification Script**:  
+  The guide mentions `verify_token.py`. Ensure this script exists in the repo and is documented elsewhere. If not, either provide it or remove the reference.
+
+- **Link to Official Docs**:  
+  Where you mention scopes and permissions, link to the official GitHub documentation for [PAT scopes](https://docs.github.com/en/github/authenticating-to-github/creating-a-personal-access-token) and [workflow permissions](https://docs.github.com/en/actions/security-guides/automatic-token-authentication).
+
+---
+
+### 3. Best Practices
+
+- **Principle of Least Privilege**:  
+  You correctly recommend using `public_repo` when possible. Consider making this recommendation more prominent.
+
+- **Token Storage**:  
+  Suggest using environment variable managers (e.g., direnv, dotenv-linter) for local development to avoid accidental leaks.
+
+- **Workflow Permissions**:  
+  Remind users to avoid setting `permissions: write-all` in workflows, and to keep permissions as narrow as possible.
+
+---
+
+### 4. Security Concerns
+
+- **Token in Shell History**:  
+  As above, using tokens directly in shell commands (e.g., curl) can leak them into shell history. Suggest using `read -s` or an environment variable.
+
+- **Token Expiry and Revocation**:  
+  Add a note about immediately revoking tokens if they are accidentally exposed.
+
+- **.env File Safety**:  
+  Reiterate that `.env` should never be committed, and suggest running `git status` to verify before pushing.
+
+---
+
+### 5. Minor / Editorial
+
+- **Formatting**:  
+  - Use consistent code block formatting (e.g., always triple backticks).
+  - Use bold or italics for important warnings.
+  - Consider adding a "Glossary" section.
+
+- **Typos**:  
+  - "The bot now uses issue comments (more compatible), but still needs write access"—clarify what "more compatible" means.
+
+---
+
+## Summary Table
+
+| Area         | Issue/Improvement                                                                 | Action                                                                 |
+|--------------|-----------------------------------------------------------------------------------|------------------------------------------------------------------------|
+| Permissions  | Table mixes workflow permissions and PAT scopes                                   | Clarify and separate                                                   |
+| Token Types  | No mention of fine-grained PATs                                                   | Add note or instructions                                               |
+| .env         | Location not specified                                                            | Specify location                                                       |
+| Security     | Token exposure in shell history                                                   | Add warning                                                            |
+| Verification | `verify_token.py` script reference                                                | Ensure script exists or remove reference                               |
+| Official Docs| No links to GitHub docs                                                           | Add links                                                              |
+| Consistency  | Mixed terminology                                                                | Add glossary or clarification                                          |
+| Rotation     | No update instructions after rotation                                             | Add instructions                                                       |
+| Formatting   | Inconsistent code blocks, warnings                                                | Standardize                                                            |
+
+---
+
+## Example Edits
+
+- **Clarify Permissions Table**  
+  > **Note:** The following table lists permissions for the GitHub Actions `GITHUB_TOKEN`. For Personal Access Tokens (PATs), see the [Creating a Personal Access Token](#creating-a-personal-access-token) section.
+
+- **Add Security Warning**  
+  > ⚠️ **Never share your token or paste it into public places (including GitHub issues or PRs). If you think your token has been exposed, revoke it immediately.**
+
+- **Add Fine-Grained PAT Note**  
+  > **Note:** GitHub is introducing fine-grained personal access tokens. If possible, use these and grant only the necessary repository permissions. See [GitHub documentation](https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token) for details.
+
+---
+
+**Overall:**  
+This is a strong and helpful guide. Addressing the above points will make it even more robust, user-friendly, and secure. Let me know if you need specific wording or further clarifications for any section!
+
+---
+
+### 📄 `examples.py`
+*Changes: +98 -0*
+
+**Code Review for `examples.py`**
+
+Thank you for providing the code changes. Below is a detailed review focusing on code quality, potential issues, best practices, and security:
+
+---
+
+### 1. Issues or Bugs Identified
+
+- **Unused Imports**:  
+  - `import os` is imported but not used anywhere in the script. This should be removed to keep the code clean.
+- **Hardcoded Example Values**:  
+  - The `repo_full_name="owner/repo"` and `pr_number=1` in `example_usage()` are placeholders. While this is fine for an example, it would be helpful to clarify in comments that these must be replaced with real values.
+- **Uncommenting Required for Execution**:  
+  - The script requires users to uncomment function calls to run examples. This is fine for documentation, but consider providing a CLI or argument-based approach for easier usage/testing.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Exception Handling**:  
+  - The examples do not include any try/except blocks. Since these functions interact with external services (GitHub, Azure OpenAI), network or authentication errors are likely. Add exception handling to provide meaningful error messages and avoid abrupt script termination.
+    ```python
+    try:
+        result = reviewer.review_pull_request(...)
+    except Exception as e:
+        print(f"Error during pull request review: {e}")
+    ```
+- **Sensitive Information in Comments**:  
+  - The commented-out code for explicit configuration includes placeholders for API keys and tokens. Add a warning in comments not to hardcode sensitive information in production code.
+- **Environment Variable Usage**:  
+  - If the script relies on environment variables, consider adding a check or a helper message if required variables are missing.
+- **Type Hints**:  
+  - Adding type hints to function signatures improves readability and helps with static analysis.
+    ```python
+    def example_usage() -> None:
+    ```
+- **Docstrings**:  
+  - The file-level docstring is good. Consider expanding function docstrings to clarify expected input and output in more detail.
+
+---
+
+### 3. Best Practices
+
+- **Separation of Concerns**:  
+  - The examples are well-structured and separated into distinct functions. Good job!
+- **Explicit Imports**:  
+  - The import of `AzureOpenAIClient` inside `example_single_file_review()` is not necessary since it is already imported at the top. Keep imports at the top unless there's a specific reason (e.g., avoiding circular imports or heavy dependencies).
+- **Logging vs. Print**:  
+  - For real-world usage, consider using the `logging` module instead of `print` statements. This allows better control over output and integrates with other logging systems.
+- **Configuration Management**:  
+  - For scripts that require credentials, consider using a configuration file or environment variable loader (e.g., `python-dotenv`) and document this in the README.
+
+---
+
+### 4. Security Concerns
+
+- **Credential Management**:  
+  - Never hardcode API keys or tokens in code. The example comments are clear, but add a warning to reinforce this.
+- **Output Sanitization**:  
+  - If the review output is printed to the console, be aware of potential sensitive information in the review content (e.g., code diffs, error messages). In production, sanitize or redact sensitive data as needed.
+- **Dependency Security**:  
+  - Ensure that the imported modules (`bot.reviewer`, `bot.azure_openai_client`, `bot.github_client`) do not expose sensitive information or have known vulnerabilities.
+
+---
+
+### 5. Maintainability and Readability
+
+- **Code Organization**:  
+  - The script is easy to follow and well-commented. Good use of function separation.
+- **Example Clarity**:  
+  - The examples are clear, but consider referencing a README or documentation for further details on required setup (e.g., environment variables, credentials).
+- **Lengthy Inline Diff Example**:  
+  - The multiline string for the diff in `example_single_file_review()` is fine for illustration, but consider loading from a file or variable for longer diffs.
+
+---
+
+## Summary of Actionable Feedback
+
+1. **Remove unused imports** (e.g., `os`).
+2. **Add exception handling** around API calls for robustness.
+3. **Warn against hardcoding credentials** in comments and documentation.
+4. **Use type hints** for function signatures.
+5. **Switch to `logging`** instead of `print` for better output management.
+6. **Keep all imports at the top** unless there's a specific reason.
+7. **Clarify placeholders** (e.g., repo names, PR numbers) in comments.
+8. **Consider a CLI or argument-based approach** for running examples.
+9. **Sanitize output** if review content may include sensitive data.
+
+---
+
+Let me know if you have any questions or would like further suggestions!
+
+---
+
+### 📄 `pytest.ini`
+*Changes: +6 -0*
+
+**PR Review: pytest.ini**
+
+Thank you for adding the `pytest.ini` configuration file. Here’s a detailed review based on your changes:
+
+---
+
+### 1. Issues or Bugs Identified
+
+- **No critical bugs detected**: The configuration is syntactically correct and should work as intended for most standard pytest setups.
+
+### 2. Suggestions for Improvement
+
+- **Explicit Test Discovery**:  
+  The settings for `python_files`, `python_classes`, and `python_functions` are good for convention-based discovery. However, if your project uses different naming conventions or includes parameterized tests/classes, consider documenting this for future contributors.
+
+- **Add Comments for Clarity**:  
+  Adding brief comments in the file can help new team members understand the rationale behind each setting. For example:
+  ```ini
+  # Look for tests in the 'tests' directory
+  testpaths = tests
+  # Only discover files starting with 'test_'
+  python_files = test_*.py
+  # Only discover classes starting with 'Test'
+  python_classes = Test*
+  # Only discover functions starting with 'test_'
+  python_functions = test_*
+  # Verbose output, short traceback
+  addopts = -v --tb=short
+  ```
+
+- **Consider Additional Useful Options**:  
+  Depending on your needs, you might want to add:
+  - `minversion = 6.0` (or your required pytest version)
+  - `norecursedirs = .git venv` (to avoid unnecessary directories)
+  - `markers = ...` (to document custom markers if you use them)
+
+### 3. Best Practices
+
+- **Consistency**:  
+  Ensure that your test files, classes, and functions consistently follow the naming conventions specified here.
+- **Version Control**:  
+  Track this file in version control to ensure consistent test discovery across environments.
+- **Documentation**:  
+  Consider referencing this configuration in your project’s README or contributing guide.
+
+### 4. Security Concerns
+
+- **No direct security concerns**:  
+  This configuration file does not introduce any security risks. However, always ensure that your test files do not contain sensitive data or credentials.
+
+---
+
+**Actionable Summary:**
+
+- [ ] (Optional) Add comments to clarify each setting.
+- [ ] (Optional) Consider adding `minversion`, `norecursedirs`, or `markers` as needed.
+- [ ] Ensure project test files follow the specified naming conventions.
+- [ ] Document the pytest configuration in your project documentation.
+
+Let me know if you have any questions or need further recommendations!
+
+---
+
+### 📄 `requirements.txt`
+*Changes: +21 -0*
+
+**Code Review for requirements.txt**
+
+---
+
+### 1. Issues & Potential Bugs
+
+- **Version Pinning:**  
+  All dependencies are specified with a minimum version (`>=`). This can lead to unpredictable behavior if newer, incompatible versions are released. For production environments, it's best to pin exact versions or use upper bounds (e.g., `openai>=1.0.0,<2.0.0`) to ensure reproducibility.
+
+- **Unused Dependencies:**  
+  Ensure that all listed packages are actually required by the project. Unnecessary dependencies increase attack surface and maintenance overhead.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Add Upper Bounds:**  
+  Consider adding upper version bounds to prevent breaking changes from future releases:
+  ```python
+  openai>=1.0.0,<2.0.0
+  PyGithub>=2.1.1,<3.0.0
+  Flask>=3.0.0,<4.0.0
+  python-dotenv>=1.0.0,<2.0.0
+  requests>=2.31.0,<3.0.0
+  PyYAML>=6.0.1,<7.0.0
+  pytest>=7.4.0,<8.0.0
+  pytest-mock>=3.12.0,<4.0.0
+  ```
+
+- **Group and Comment Dependencies:**  
+  You've already grouped dependencies with comments, which is great for readability. Consider adding a section for "Core dependencies" and "Development dependencies" (e.g., testing tools) for further clarity.
+
+- **Development vs. Production Dependencies:**  
+  If `pytest` and `pytest-mock` are only used for testing, consider moving them to a separate `requirements-dev.txt` or using a `requirements.txt` + `requirements-dev.txt` structure.
+
+---
+
+### 3. Best Practices
+
+- **Freeze Dependencies:**  
+  After installing, generate a `requirements.lock` or `requirements.txt` with exact versions using `pip freeze > requirements.txt` for deployment.
+
+- **Dependency Updates:**  
+  Regularly review and update dependencies to patch vulnerabilities and improve performance.
+
+---
+
+### 4. Security Concerns
+
+- **Minimize Attack Surface:**  
+  Only include packages that are absolutely necessary. Each additional package increases the risk of supply chain attacks.
+
+- **Monitor Vulnerabilities:**  
+  Use tools like `pip-audit` or `safety` to scan dependencies for known vulnerabilities.
+
+- **Flask Security:**  
+  Flask is a web framework and can expose endpoints. Ensure that Flask-related code follows best practices for securing web applications (e.g., input validation, CSRF protection).
+
+---
+
+### Actionable Recommendations
+
+1. **Pin or Bound Versions:**  
+   Add upper bounds to all dependencies to reduce risk of breaking changes.
+
+2. **Separate Dev Dependencies:**  
+   Move testing dependencies to a separate file if not needed in production.
+
+3. **Regular Audits:**  
+   Use dependency scanning tools in your CI/CD pipeline.
+
+4. **Review Necessity:**  
+   Double-check that all dependencies are required for your UiPath automation project.
+
+---
+
+**Example Improved requirements.txt:**
+```python
+# Azure OpenAI SDK
+openai>=1.0.0,<2.0.0
+
+# GitHub API
+PyGithub>=2.1.1,<3.0.0
+
+# Web framework for webhook handling
+Flask>=3.0.0,<4.0.0
+
+# Environment variables
+python-dotenv>=1.0.0,<2.0.0
+
+# HTTP requests
+requests>=2.31.0,<3.0.0
+
+# YAML parsing for UiPath files
+PyYAML>=6.0.1,<7.0.0
+```
+*Move testing dependencies to requirements-dev.txt:*
+```python
+# requirements-dev.txt
+pytest>=7.4.0,<8.0.0
+pytest-mock>=3.12.0,<4.0.0
+```
+
+---
+
+**Summary:**  
+Good grouping and commenting. Please add upper bounds, separate dev dependencies, and regularly audit for vulnerabilities. This will improve reproducibility, security, and maintainability.
+
+---
+
+### 📄 `setup.py`
+*Changes: +20 -0*
+
+**Code Review for setup.py**
+
+Thank you for submitting the new setup.py file. Below are my observations and suggestions:
+
+---
+
+### 1. Issues / Bugs
+
+- **File Handling for README.md**  
+  The line:
+  ```python
+  long_description=open("README.md").read(),
+  ```
+  opens the file but does not close it. This can lead to resource leaks, especially in environments with strict file handle limits.  
+  **Suggestion:** Use a context manager (`with` statement) to ensure the file is properly closed:
+  ```python
+  with open("README.md", "r", encoding="utf-8") as fh:
+      long_description = fh.read()
+  ```
+  Then pass `long_description=long_description,` to `setup()`.
+
+- **Missing setup.py Metadata**  
+  Consider adding additional metadata such as `url`, `license`, `classifiers`, and `keywords` to improve package discoverability and compliance with PyPI standards.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Pinning Dependency Versions**  
+  Currently, dependencies are specified with minimum versions (e.g., `openai>=1.0.0`). While this ensures compatibility with newer versions, it can also introduce breaking changes if upstream packages release incompatible updates.  
+  **Suggestion:** Consider pinning versions more strictly or using upper bounds (e.g., `openai>=1.0.0,<2.0.0`) to avoid unexpected issues.
+
+- **Encoding in File Operations**  
+  When reading files, always specify the encoding to avoid issues on different platforms:
+  ```python
+  with open("README.md", "r", encoding="utf-8") as fh:
+      long_description = fh.read()
+  ```
+
+- **Project Structure**  
+  Ensure that your package has an `__init__.py` file in the root of the package directory so that `find_packages()` works as expected.
+
+---
+
+### 3. Best Practices
+
+- **PEP 8 Compliance**  
+  The code is generally PEP 8 compliant. Good job!
+
+- **Explicit Python Version**  
+  Specifying `python_requires=">=3.8"` is good practice.
+
+- **Descriptive Naming**  
+  The `name` and `description` fields are clear and descriptive.
+
+---
+
+### 4. Security Concerns
+
+- **Dependencies**  
+  Review and audit all dependencies for known vulnerabilities, especially since some (like `requests`, `PyYAML`) have had security issues in the past. Consider using tools like `pip-audit` or `safety` in your CI pipeline.
+
+- **Sensitive Data**  
+  Ensure that no sensitive data (e.g., API keys, secrets) is included in the codebase or in the `README.md` file referenced here.
+
+---
+
+### 5. Example Improved setup.py
+
+```python
+from setuptools import setup, find_packages
+
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
+
+setup(
+    name="uipath-code-reviewer",
+    version="0.1.0",
+    packages=find_packages(),
+    install_requires=[
+        "openai>=1.0.0,<2.0.0",
+        "PyGithub>=2.1.1,<3.0.0",
+        "Flask>=3.0.0,<4.0.0",
+        "python-dotenv>=1.0.0,<2.0.0",
+        "requests>=2.31.0,<3.0.0",
+        "PyYAML>=6.0.1,<7.0.0",
+    ],
+    python_requires=">=3.8",
+    author="UiPath Code Reviewer Bot",
+    description="A bot that uses Azure OpenAI to review UiPath automation code",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://github.com/your-org/uipath-code-reviewer",  # Update as appropriate
+    license="MIT",  # Update as appropriate
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+    ],
+    keywords="uipath code-review openai automation",
+)
+```
+
+---
+
+**Summary of Action Items:**
+
+- Use a context manager to read README.md.
+- Pin dependency versions more strictly.
+- Add missing metadata (url, license, classifiers, keywords).
+- Specify encoding when reading files.
+- Audit dependencies for vulnerabilities.
+
+Let me know if you have any questions or need further clarification!
+
+---
+
+### 📄 `tests/__init__.py`
+*Changes: +3 -0*
+
+**Code Review for `tests/__init__.py`**
+
+---
+
+### Summary of Changes
+
+A new `__init__.py` file has been added to the `tests` directory with the following content:
+```python
+"""
+Tests package
+"""
+```
+
+---
+
+### Review
+
+#### 1. Issues or Bugs
+
+- **No Functional Code:** The file only contains a docstring and does not introduce any functional code. There are no bugs or issues with this approach.
+
+#### 2. Suggestions for Improvement
+
+- **Purpose of `__init__.py`:** The primary purpose of an `__init__.py` file is to mark a directory as a Python package. An empty file is sufficient for this purpose. Adding a docstring is optional and can be useful for documentation.
+- **Docstring Clarity:** If you intend to provide documentation, consider expanding the docstring to clarify the purpose of the test package, e.g., what kind of tests are included or any specific instructions for running tests.
+- **Encoding Declaration:** If you plan to add non-ASCII characters in the future, consider adding an encoding declaration at the top (e.g., `# -*- coding: utf-8 -*-`). For now, it's not necessary.
+
+#### 3. Best Practices
+
+- **Minimalism:** Keeping the `__init__.py` file minimal is a good practice unless you need to expose specific test utilities or fixtures.
+- **Avoid Unnecessary Code:** Do not add code or imports unless required for test discovery or setup.
+
+#### 4. Security Concerns
+
+- **No Security Issues:** Since the file only contains a docstring, there are no security concerns.
+
+---
+
+### Actionable Feedback
+
+1. **Docstring Enhancement (Optional):**
+   - Consider expanding the docstring to provide more context about the test package if you think it will be useful for future maintainers.
+   - Example:
+     ```python
+     """
+     This package contains unit and integration tests for the project.
+     """
+     ```
+
+2. **Keep the File Minimal:**
+   - If no additional functionality is needed, an empty `__init__.py` is perfectly acceptable.
+
+3. **No Further Action Needed:**
+   - No bugs or security issues identified. The change is safe and follows standard practices.
+
+---
+
+**Conclusion:**  
+The addition of a minimal `__init__.py` file with a docstring is acceptable and follows best practices. Consider expanding the docstring if you want to provide more context, but otherwise, this change is good to merge.
+
+---
+
+### 📄 `tests/test_azure_openai_client.py`
+*Changes: +112 -0*
+
+**Code Review for `tests/test_azure_openai_client.py`**
+
+---
+
+### General Feedback
+
+The test suite for `AzureOpenAIClient` is thorough and covers initialization, file type detection, prompt building, and code review functionality. The use of mocking and patching is appropriate for isolating dependencies. However, there are several areas where improvements can be made regarding code quality, best practices, potential issues, and maintainability.
+
+---
+
+### 1. Issues & Bugs
+
+**a. Test Isolation & Environment Variables**
+- The use of `@patch.dict('os.environ', ...)` in `test_init_with_env_vars` is good, but other tests may rely on environment variables if the implementation falls back to `os.environ` when parameters are not provided. Ensure that tests do not leak environment state between each other. Consider using `@patch.dict` or explicitly setting/unsetting environment variables in all relevant tests.
+
+**b. Private Method Testing**
+- Tests like `test_get_file_type_xaml`, `test_get_file_type_json`, and `test_get_file_type_python` are directly testing the private method `_get_file_type`. While this is sometimes necessary, it's generally preferable to test public interfaces unless there's a strong reason. If `_get_file_type` is critical, consider making it a public method or testing it indirectly through public methods.
+
+**c. Mocking AzureOpenAI**
+- In `test_review_code_success`, the patch target `'bot.azure_openai_client.AzureOpenAI'` assumes that `AzureOpenAI` is imported in `bot.azure_openai_client`. If the import path changes, this test will silently fail. Consider using `autospec=True` for more robust mocking and verify the patch target matches the actual import.
+
+**d. Assertion on Mock Call**
+- The assertion `mock_client.chat.completions.create.assert_called_once()` is good, but you may want to use `assert_called_once_with(...)` to verify the arguments passed, ensuring the client is called as expected.
+
+---
+
+### 2. Suggestions for Improvement
+
+**a. Test Naming & Structure**
+- Consider using pytest fixtures for client initialization to reduce repetition and improve readability.
+- Group related tests using `pytest.mark.parametrize` where appropriate, especially for file type detection.
+
+**b. Coverage**
+- Add tests for error handling in `review_code`, such as when the Azure API returns an error or unexpected response.
+- Test edge cases, such as empty diffs, unsupported file types, or missing parameters.
+
+**c. Test Readability**
+- Add comments to clarify the purpose of each test, especially where mocking or patching is involved.
+
+**d. Use of MagicMock**
+- When mocking responses, explicitly set attributes rather than using nested `MagicMock` objects. This improves readability and reduces confusion.
+
+---
+
+### 3. Best Practices
+
+**a. Avoid Testing Private Methods**
+- Prefer testing public methods unless the private method is complex and not covered by public interfaces.
+
+**b. Consistent Setup**
+- Use fixtures or setup methods to ensure consistent client initialization and teardown.
+
+**c. Mock External Dependencies**
+- Always mock external services (like Azure) to avoid network calls and ensure test reliability.
+
+**d. Explicit Exception Testing**
+- Use `pytest.raises` with explicit error messages to ensure the correct exception is raised.
+
+---
+
+### 4. Security Concerns
+
+**a. Sensitive Data Exposure**
+- Ensure that test keys and endpoints used in tests are dummy values and not production credentials. The values used here are safe, but double-check that no real secrets are committed.
+
+**b. Environment Variable Handling**
+- Be cautious with environment variables in tests. If tests are run in CI/CD environments, ensure that test-specific variables do not overwrite or leak into production settings.
+
+---
+
+### 5. Actionable Recommendations
+
+1. **Use Fixtures for Client Initialization**
+   ```python
+   @pytest.fixture
+   def client():
+       return AzureOpenAIClient(
+           azure_endpoint='https://test.openai.azure.com/',
+           api_key='test-key',
+           deployment_name='test-deployment',
+       )
+   ```
+   Then use `client` in tests to reduce duplication.
+
+2. **Parametrize File Type Tests**
+   ```python
+   @pytest.mark.parametrize("file_path,expected_type", [
+       ("workflow.xaml", "uipath_workflow"),
+       ("project.json", "uipath_config"),
+       ("script.py", "python"),
+   ])
+   def test_get_file_type(client, file_path, expected_type):
+       assert client._get_file_type(file_path) == expected_type
+   ```
+
+3. **Improve Mocking in `test_review_code_success`**
+   - Use `assert_called_once_with` to verify arguments.
+   - Set `mock_response.choices[0].message.content = "Great code!"` directly for clarity.
+
+4. **Add Negative Tests for `review_code`**
+   - Test cases where the API returns an error, or the response does not contain the expected structure.
+
+5. **Document Tests**
+   - Add docstrings or comments to clarify the intent of each test, especially where patching or mocking is involved.
+
+---
+
+### Summary
+
+- The test suite is comprehensive and well-structured, but can be improved by using fixtures, parameterization, and more robust mocking.
+- Avoid testing private methods directly unless necessary.
+- Ensure environment variables are handled safely and consistently.
+- Add negative and edge case tests for better coverage.
+- No security concerns found with the current dummy values, but always double-check for real secrets.
+
+**Please address the above suggestions to improve test reliability, maintainability, and coverage.**
+
+---
+
+### 📄 `tests/test_github_client.py`
+*Changes: +194 -0*
+
+**Code Review for tests/test_github_client.py**
+
+Thank you for adding comprehensive tests for the `GitHubClient` class. The test coverage is strong and the use of mocking is appropriate for isolating dependencies. Here are my comments and suggestions:
+
+---
+
+### 1. Issues / Bugs Identified
+
+- **Patch Target for `Github` Class**:  
+  The tests use `@patch('bot.github_client.Github')` to mock the `Github` class. This is correct if `Github` is imported in `bot/github_client.py` as `from github import Github`. If the import uses a different path or alias, the patch target may not work as intended. Please double-check the import path in `bot/github_client.py` to ensure the patch is effective.
+
+- **Testing for Exception Messages**:  
+  In `test_post_review_comment_no_fallback_for_other_errors`, you use `pytest.raises(Exception, match="Failed to post review comment")`. If the actual exception raised is not a generic `Exception` or the message differs, this test may become brittle. Consider catching the specific exception type your code raises (e.g., a custom exception or `GithubException`) for clarity and maintainability.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Test Naming Consistency**:  
+  The test method names are descriptive, which is great. For even more clarity, consider using a consistent verb tense (e.g., "should_fallback_to_review_on_403" or "returns_pr_files_as_dicts").
+
+- **Test Coverage for Edge Cases**:  
+  - Consider adding tests for:
+    - Posting a review comment when there are no commits in the PR (i.e., `get_commits` returns an empty list).
+    - Handling of network errors or unexpected exceptions from the GitHub API.
+    - Large PRs with many files (test `get_pr_files` with multiple mock files).
+
+- **Assertions on All Outputs**:  
+  In `test_get_pr_files`, you assert on two fields. For completeness, consider asserting all fields (`filename`, `status`, `additions`, `deletions`, `changes`, `patch`) to ensure the mapping is correct.
+
+- **Use of Fixtures**:  
+  If you find yourself repeating mock setup code (e.g., creating `mock_repo`, `mock_pr`), consider extracting these into pytest fixtures for better readability and maintainability.
+
+---
+
+### 3. Best Practices
+
+- **Docstrings in Tests**:  
+  Good use of docstrings for each test method. This helps with readability and understanding test intent.
+
+- **MagicMock vs Mock**:  
+  You consistently use `MagicMock` for objects that may have dynamic attributes/methods, which is appropriate.
+
+- **Patch Usage**:  
+  Usage of `@patch` and `@patch.dict` is correct and helps isolate environment and dependencies.
+
+---
+
+### 4. Security Concerns
+
+- **Token Handling in Tests**:  
+  The tests use hardcoded tokens like `'test-token'` and `'env-token'`, which is fine for testing as long as these are not real credentials. Ensure that no actual secrets are committed.
+
+- **Environment Variable Manipulation**:  
+  The use of `@patch.dict('os.environ', ...)` is safe in the test context. Just ensure that tests are not run in a way that could accidentally leak or overwrite real environment variables.
+
+---
+
+### 5. Additional Minor Suggestions
+
+- **Test File Header**:  
+  The file docstring is good. Consider adding a brief note about the test dependencies (e.g., "Requires pytest and unittest.mock").
+
+- **Type Annotations**:  
+  While not required, adding type annotations to test methods (e.g., `def test_xxx(self) -> None:`) can help with static analysis tools.
+
+---
+
+## Summary
+
+- ✔️ Good test coverage and use of mocks.
+- ✔️ Clear test method names and docstrings.
+- ❗ Double-check patch targets and exception handling.
+- 🔼 Consider adding more edge case tests and using fixtures for repeated setup.
+- 🔒 No security issues identified, but keep test tokens fake.
+
+**Action Items:**
+- [ ] Verify patch target for `Github` is correct.
+- [ ] Use more specific exception types in assertions.
+- [ ] Add edge case tests (e.g., empty commits, multiple files).
+- [ ] Assert all output fields in `test_get_pr_files`.
+- [ ] Optionally refactor repeated mock setup into fixtures.
+
+Let me know if you need help with any of these suggestions!
+
+---
+
+### 📄 `tests/test_reviewer.py`
+*Changes: +120 -0*
+
+**Code Review for `tests/test_reviewer.py`**
+
+Thank you for providing comprehensive tests for the `CodeReviewer` class. Here’s a detailed review based on your changes:
+
+---
+
+### 1. Issues or Bugs Identified
+
+- **Test Coverage for Error/Edge Cases:**  
+  The current tests focus on the "happy path" and basic filtering. However, there are no tests for error handling, such as:
+    - What happens if the Azure client raises an exception?
+    - How does `_review_file` behave if the file dict is missing expected keys?
+    - What if the GitHub client returns `None` or an unexpected structure?
+  Consider adding tests for these scenarios to improve robustness.
+
+- **Assertions Could Be More Specific:**  
+  In `test_compile_overall_review`, the assertion `assert 'UiPath Code Review' in overall` is good, but you could also assert the type of `overall` (e.g., string) and check for expected formatting.
+
+- **Mock Return Values:**  
+  In `test_review_pull_request_no_uipath_files`, the mock file dict does not include all keys that may be expected by the reviewer (e.g., `additions`, `deletions`). If the implementation expects these, the test could fail unexpectedly if the implementation changes.
+
+---
+
+### 2. Suggestions for Improvement
+
+- **Test Naming Consistency:**  
+  Your test names are clear and descriptive. Consider prefixing with `should_` for behavior-driven clarity (e.g., `def test_should_filter_only_xaml_files`).
+
+- **Test Structure:**  
+  If you expect to add more tests, consider using fixtures for the `CodeReviewer` instantiation to avoid repetition.
+
+- **Parameterization:**  
+  Use `pytest.mark.parametrize` for similar tests, such as filtering different file types. This reduces code duplication and improves maintainability.
+
+  ```python
+  @pytest.mark.parametrize("files,expected_count,extension", [
+      ([{'filename': 'Main.xaml'}, {'filename': 'README.md'}], 1, '.xaml'),
+      ([{'filename': 'project.json'}, {'filename': 'test.py'}], 1, '.json'),
+  ])
+  def test_filter_uipath_files(self, files, expected_count, extension):
+      reviewer = CodeReviewer(github_client=Mock(), azure_client=Mock())
+      filtered = reviewer._filter_uipath_files(files)
+      assert len(filtered) == expected_count
+      assert all(f['filename'].endswith(extension) for f in filtered)
+  ```
+
+- **Mocking Best Practices:**  
+  Use `autospec=True` with `Mock()` where possible to ensure your mocks match the real interface, catching typos or incorrect usage.
+
+- **Docstrings:**  
+  Your docstrings are concise and helpful. Consider adding more detail about the intent of each test, especially for edge cases.
+
+---
+
+### 3. Best Practices
+
+- **Private Methods Testing:**  
+  You are directly testing private methods (e.g., `_filter_uipath_files`). While this is sometimes necessary, it’s generally better to test public interfaces to avoid coupling tests to implementation details. If possible, test these behaviors via the public methods.
+
+- **Arrange-Act-Assert Pattern:**  
+  Your tests generally follow this pattern, which is good. Consider adding comments to separate these sections for clarity.
+
+- **Test Isolation:**  
+  All dependencies are mocked, ensuring test isolation. Good job!
+
+---
+
+### 4. Security Concerns
+
+- **No Sensitive Data:**  
+  There is no handling of sensitive data in these tests.
+
+- **Mocking External Services:**  
+  Ensure that the mocks do not accidentally leak credentials or sensitive information if you expand these tests.
+
+---
+
+### 5. Additional Suggestions
+
+- **Test for Large Input Sets:**  
+  Add tests with large lists of files to check performance and ensure the filter logic scales.
+
+- **Test Output Format:**  
+  For `_compile_overall_review`, consider testing the exact output format (e.g., Markdown correctness) if it is consumed by other systems.
+
+- **Negative Testing:**  
+  Add tests for unexpected input types (e.g., files as `None`, missing keys, etc.) to ensure graceful failure.
+
+---
+
+## Summary Table
+
+| Area                | Feedback                                                                                  |
+|---------------------|------------------------------------------------------------------------------------------|
+| Bugs                | Add tests for error/edge cases and unexpected input.                                     |
+| Improvements        | Use parameterization, fixtures, and more specific assertions.                            |
+| Best Practices      | Prefer testing public methods; use `autospec` for mocks.                                 |
+| Security            | No concerns found. Ensure mocks don’t leak sensitive data if expanded.                   |
+| Maintainability     | Good use of docstrings and isolation. Consider more detailed comments and refactoring.   |
+
+---
+
+**Action Items:**
+1. Add tests for error handling and edge cases.
+2. Use parameterized tests for filtering logic.
+3. Prefer testing via public interfaces where possible.
+4. Use `autospec=True` for mocks.
+5. Expand assertions to check output format and types.
+
+Let me know if you need help with any of these improvements!
+
+---
+
+### 📄 `verify_token.py`
+*Changes: +219 -0*
+
+**Code Review for `verify_token.py`**
+
+Thank you for submitting this script! It is well-structured, user-friendly, and provides clear feedback to the user. Below are my detailed review comments, organized by topic:
+
+---
+
+### 1. Issues and Potential Bugs
+
+**a. Use of Private Attributes in PyGithub**
+- In `check_token_scopes`, the code accesses `client._Github__requester._Requester__auth.token` to retrieve the token. This is a private attribute (name-mangled), and relying on such internals is fragile and may break with PyGithub updates.  
+  **Action:** Use the original `token` variable instead (since you already have it), or pass it explicitly to the function.
+
+**b. Permissions Attribute May Not Always Be Present**
+- In `test_repo_access`, you access `repo.permissions`. This attribute is only available if the authenticated user has access to the repository and the API returns it. For some tokens or public repos, this may not be present, leading to an `AttributeError`.
+  **Action:** Use `getattr(repo, "permissions", None)` and check if it's not `None` before accessing `perms.admin`, etc.
+
+**c. Exception Handling for Requests**
+- In `check_token_scopes`, if the request to `https://api.github.com/user` fails (e.g., due to network issues), the script may not handle all exceptions gracefully.
+  **Action:** Consider catching `requests.RequestException` specifically and providing a more targeted error message.
+
+**d. Unused Imports**
+- The `requests` import is inside a function, which is fine, but consider moving it to the top for clarity and to avoid repeated imports if the function is called multiple times.
+
+---
+
+### 2. Suggestions for Improvement
+
+**a. Logging vs. Printing**
+- For scripts that may be used in CI/CD or automation, consider using the `logging` module instead of `print` for better control over output and log levels.
+
+**b. Return Codes**
+- The script uses `sys.exit(1)` on error, which is good. However, consider using different exit codes for different failure types (e.g., 2 for authentication failure, 3 for missing scopes) to help in automation scenarios.
+
+**c. Docstrings and Comments**
+- The docstrings are clear and helpful. Consider adding a short docstring to each function describing parameters and return values for even better clarity.
+
+**d. Dependency Management**
+- The script assumes `PyGithub` and optionally `python-dotenv` are installed. Consider adding a requirements.txt or a comment at the top listing dependencies.
+
+**e. User Guidance**
+- When suggesting to use a `.env` file, mention that the script will automatically load it if `python-dotenv` is installed.
+
+---
+
+### 3. Best Practices
+
+**a. Avoid Hardcoding Sensitive Data**
+- The script never prints the full token, which is good. Ensure that no debugging statements are added in the future that might leak the token.
+
+**b. Use of Unicode in Output**
+- The use of emoji/unicode in output is user-friendly, but may not render well in all terminals. Consider providing a flag to disable them for CI/CD use.
+
+**c. Modularization**
+- The script is modular and each function has a clear responsibility. Good job!
+
+---
+
+### 4. Security Concerns
+
+**a. Token Exposure**
+- Printing the first 7 characters of the token is generally safe, but remind users not to share the output publicly, as even partial tokens can be useful for attackers in some scenarios.
+
+**b. Token in Requests**
+- When making the direct `requests.get` call, ensure that the token is not accidentally logged or exposed in error messages.
+
+**c. .env File Loading**
+- Loading from `.env` is helpful, but warn users not to commit `.env` files containing secrets to version control.
+
+---
+
+### 5. Minor Suggestions
+
+- Consider adding a `--help` or `-h` flag to print usage instructions.
+- If the script is intended for cross-platform use, ensure that emoji/unicode output does not cause encoding errors on Windows terminals.
+
+---
+
+## Summary of Actionable Feedback
+
+1. **Avoid using private attributes of PyGithub**; pass the token explicitly to `check_token_scopes`.
+2. **Check for existence of `repo.permissions`** before accessing its attributes to avoid `AttributeError`.
+3. **Improve exception handling** for network requests and provide specific error messages.
+4. **Move all imports to the top** of the file for clarity.
+5. **Document dependencies** and consider providing a requirements.txt.
+6. **Remind users not to share output** containing partial tokens.
+7. **Warn about committing `.env` files** with secrets.
+8. **Consider using the `logging` module** for better output control.
+9. **Add a flag to disable emoji/unicode output** for CI/CD environments.
+
+---
+
+**Overall, this is a solid and helpful script! Addressing the above points will make it even more robust, maintainable, and secure.**
+
+---
+
+*Review powered by Azure OpenAI*

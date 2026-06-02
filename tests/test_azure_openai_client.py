@@ -189,3 +189,81 @@ class TestAzureOpenAIClient:
         result = client._parse_ai_response(raw)
         assert len(result['comments']) == 1
         assert result['comments'][0]['body'] == 'valid'
+
+    def test_parse_ai_response_with_suggested_fix(self):
+        """Test that suggested_fix is preserved when present."""
+        client = AzureOpenAIClient(
+            azure_endpoint='https://test.openai.azure.com/',
+            api_key='test-key',
+            deployment_name='test-deployment',
+        )
+        raw = '{"summary": "ok", "comments": [{"line": 5, "body": "Use descriptive name", "severity": "suggestion", "suggested_fix": "    better_name = compute()"}]}'
+        result = client._parse_ai_response(raw)
+        assert len(result['comments']) == 1
+        assert result['comments'][0]['suggested_fix'] == '    better_name = compute()'
+
+    def test_parse_ai_response_without_suggested_fix(self):
+        """Test that absent suggested_fix does not cause errors."""
+        client = AzureOpenAIClient(
+            azure_endpoint='https://test.openai.azure.com/',
+            api_key='test-key',
+            deployment_name='test-deployment',
+        )
+        raw = '{"summary": "ok", "comments": [{"line": 3, "body": "Looks fine", "severity": "praise"}]}'
+        result = client._parse_ai_response(raw)
+        assert len(result['comments']) == 1
+        assert 'suggested_fix' not in result['comments'][0]
+
+    def test_parse_ai_response_empty_suggested_fix_excluded(self):
+        """Test that empty, null, and whitespace-only suggested_fix values are excluded."""
+        client = AzureOpenAIClient(
+            azure_endpoint='https://test.openai.azure.com/',
+            api_key='test-key',
+            deployment_name='test-deployment',
+        )
+        # Empty string
+        raw = '{"summary": "ok", "comments": [{"line": 1, "body": "test", "suggested_fix": ""}]}'
+        result = client._parse_ai_response(raw)
+        assert 'suggested_fix' not in result['comments'][0]
+
+        # Whitespace only
+        raw = '{"summary": "ok", "comments": [{"line": 1, "body": "test", "suggested_fix": "   "}]}'
+        result = client._parse_ai_response(raw)
+        assert 'suggested_fix' not in result['comments'][0]
+
+        # Null
+        raw = '{"summary": "ok", "comments": [{"line": 1, "body": "test", "suggested_fix": null}]}'
+        result = client._parse_ai_response(raw)
+        assert 'suggested_fix' not in result['comments'][0]
+
+    def test_parse_ai_response_multiline_suggested_fix_rejected(self):
+        """Test that multi-line suggested_fix is rejected."""
+        client = AzureOpenAIClient(
+            azure_endpoint='https://test.openai.azure.com/',
+            api_key='test-key',
+            deployment_name='test-deployment',
+        )
+        raw = '{"summary": "ok", "comments": [{"line": 1, "body": "test", "suggested_fix": "line1\\nline2"}]}'
+        result = client._parse_ai_response(raw)
+        assert 'suggested_fix' not in result['comments'][0]
+
+    @patch('bot.azure_openai_client.AzureOpenAI')
+    def test_review_code_structured_with_suggested_fix(self, mock_azure_openai):
+        """Test full structured review flow preserves suggested_fix."""
+        mock_client = MagicMock()
+        json_response = '{"summary": "Needs fixes", "comments": [{"line": 10, "body": "Rename var", "severity": "issue", "suggested_fix": "    count = 0"}]}'
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock(message=MagicMock(content=json_response))]
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_azure_openai.return_value = mock_client
+
+        client = AzureOpenAIClient(
+            azure_endpoint='https://test.openai.azure.com/',
+            api_key='test-key',
+            deployment_name='test-deployment',
+        )
+
+        result = client.review_code_structured(diff="+ new line", file_path="test.py")
+        assert result['summary'] == 'Needs fixes'
+        assert len(result['comments']) == 1
+        assert result['comments'][0]['suggested_fix'] == '    count = 0'

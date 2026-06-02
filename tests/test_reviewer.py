@@ -261,3 +261,135 @@ class TestCodeReviewer:
         assert 'Looks good.' in summary
         assert '+5 -2' in summary
         assert 'Reviewed 1 file(s)' in summary
+
+    def test_review_inline_with_suggested_fix(self):
+        """Test that suggestion block is appended when suggested_fix is present."""
+        mock_github = Mock()
+        mock_github.get_pr_files.return_value = [
+            {
+                'filename': 'Main.xaml',
+                'status': 'modified',
+                'additions': 1,
+                'deletions': 0,
+                'changes': 1,
+                'patch': '@@ -1,2 +1,3 @@\n ctx\n+new\n ctx2',
+            }
+        ]
+        mock_azure = Mock()
+        mock_azure.review_code_structured.return_value = {
+            'summary': 'Rename variable.',
+            'comments': [
+                {
+                    'line': 2,
+                    'body': 'Use a descriptive name.',
+                    'severity': 'issue',
+                    'suggested_fix': '    better_name = compute()',
+                },
+            ]
+        }
+
+        reviewer = CodeReviewer(
+            github_client=mock_github,
+            azure_client=mock_azure,
+        )
+
+        result = reviewer.review_pull_request(
+            'owner/repo', 1, post_comments=False, inline_comments=True
+        )
+        assert len(result['inline_comments']) == 1
+        body = result['inline_comments'][0]['body']
+        assert '```suggestion' in body
+        assert '    better_name = compute()' in body
+        assert body.endswith('\n```')
+
+    def test_review_inline_without_suggested_fix_unchanged(self):
+        """Test that no suggestion block appears when suggested_fix is absent."""
+        mock_github = Mock()
+        mock_github.get_pr_files.return_value = [
+            {
+                'filename': 'Main.xaml',
+                'status': 'modified',
+                'additions': 1,
+                'deletions': 0,
+                'changes': 1,
+                'patch': '@@ -1,2 +1,3 @@\n ctx\n+new\n ctx2',
+            }
+        ]
+        mock_azure = Mock()
+        mock_azure.review_code_structured.return_value = {
+            'summary': 'Looks good.',
+            'comments': [
+                {'line': 2, 'body': 'Nice work here.', 'severity': 'praise'},
+            ]
+        }
+
+        reviewer = CodeReviewer(
+            github_client=mock_github,
+            azure_client=mock_azure,
+        )
+
+        result = reviewer.review_pull_request(
+            'owner/repo', 1, post_comments=False, inline_comments=True
+        )
+        assert len(result['inline_comments']) == 1
+        body = result['inline_comments'][0]['body']
+        assert '```suggestion' not in body
+
+    def test_review_inline_mixed_comments(self):
+        """Test mix of comments with and without suggested_fix."""
+        mock_github = Mock()
+        mock_github.get_pr_files.return_value = [
+            {
+                'filename': 'workflow.xaml',
+                'status': 'modified',
+                'additions': 3,
+                'deletions': 0,
+                'changes': 3,
+                'patch': '@@ -1,2 +1,5 @@\n ctx\n+line1\n+line2\n+line3\n ctx2',
+            }
+        ]
+        mock_azure = Mock()
+        mock_azure.review_code_structured.return_value = {
+            'summary': 'Mixed feedback.',
+            'comments': [
+                {
+                    'line': 2,
+                    'body': 'Fix naming.',
+                    'severity': 'issue',
+                    'suggested_fix': '    x = 1',
+                },
+                {
+                    'line': 3,
+                    'body': 'Good pattern.',
+                    'severity': 'praise',
+                },
+                {
+                    'line': 4,
+                    'body': 'Add type hint.',
+                    'severity': 'suggestion',
+                    'suggested_fix': '    count: int = 0',
+                },
+            ]
+        }
+
+        reviewer = CodeReviewer(
+            github_client=mock_github,
+            azure_client=mock_azure,
+        )
+
+        result = reviewer.review_pull_request(
+            'owner/repo', 1, post_comments=False, inline_comments=True
+        )
+        comments = result['inline_comments']
+        assert len(comments) == 3
+
+        # First comment has suggestion
+        assert '```suggestion' in comments[0]['body']
+        assert '    x = 1' in comments[0]['body']
+
+        # Second comment (praise) has no suggestion
+        assert '```suggestion' not in comments[1]['body']
+
+        # Third comment has suggestion
+        assert '```suggestion' in comments[2]['body']
+        assert '    count: int = 0' in comments[2]['body']

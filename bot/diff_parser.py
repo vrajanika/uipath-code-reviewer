@@ -101,6 +101,29 @@ def parse_patch(patch: str) -> List[DiffLine]:
     return result
 
 
+def get_line_content(patch: str, new_line_number: int) -> Optional[str]:
+    """
+    Extract the content of a new-file line from the patch, prefix stripped.
+
+    Looks up the line by its new-file line number and returns the raw text
+    with the leading +/space prefix removed.
+
+    Args:
+        patch: Raw patch string from GitHub API.
+        new_line_number: The new-file line number to look up.
+
+    Returns:
+        The line content with prefix stripped, or None if not found.
+    """
+    diff_lines = parse_patch(patch)
+    for dl in diff_lines:
+        if dl.new_line_number == new_line_number:
+            if dl.content and len(dl.content) > 0:
+                return dl.content[1:]  # strip +/space prefix
+            return dl.content
+    return None
+
+
 def build_position_map(patch: str) -> Dict[int, int]:
     """
     Build a mapping from new-file line numbers to diff positions.

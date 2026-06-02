@@ -3,7 +3,7 @@ Tests for diff position mapping utility.
 """
 
 import pytest
-from bot.diff_parser import parse_patch, build_position_map, DiffLine
+from bot.diff_parser import parse_patch, build_position_map, get_line_content, DiffLine
 
 
 class TestParsePatch:
@@ -163,3 +163,48 @@ class TestBuildPositionMap:
         assert pos_map[2] == 2   # add1
         assert pos_map[10] == 3  # ctx2
         assert pos_map[11] == 4  # add2
+
+
+class TestGetLineContent:
+    """Test cases for get_line_content."""
+
+    def test_get_line_content_added_line(self):
+        """Returns content of an added line with + prefix stripped."""
+        patch = (
+            "@@ -10,3 +10,5 @@\n"
+            " existing1\n"
+            " existing2\n"
+            "+new1\n"
+            "+new2\n"
+            " existing3"
+        )
+        assert get_line_content(patch, 12) == "new1"
+        assert get_line_content(patch, 13) == "new2"
+
+    def test_get_line_content_context_line(self):
+        """Returns content of a context line with space prefix stripped."""
+        patch = (
+            "@@ -10,3 +10,5 @@\n"
+            " existing1\n"
+            " existing2\n"
+            "+new1\n"
+            "+new2\n"
+            " existing3"
+        )
+        assert get_line_content(patch, 10) == "existing1"
+        assert get_line_content(patch, 14) == "existing3"
+
+    def test_get_line_content_not_in_patch(self):
+        """Returns None when the line number is not in the patch."""
+        patch = (
+            "@@ -10,2 +10,3 @@\n"
+            " existing\n"
+            "+added\n"
+            " existing2"
+        )
+        assert get_line_content(patch, 999) is None
+
+    def test_get_line_content_empty_patch(self):
+        """Returns None for empty patch."""
+        assert get_line_content("", 1) is None
+        assert get_line_content("  ", 1) is None

@@ -112,10 +112,17 @@ class CodeReviewer:
                     emoji = SEVERITY_EMOJI.get(severity, '')
                     prefix = f"{emoji} **{severity.upper()}**: " if emoji else ""
 
+                    body = f"{prefix}{comment['body']}"
+
+                    # Append GitHub suggestion block if the AI provided a fix
+                    suggested_fix = comment.get('suggested_fix')
+                    if suggested_fix:
+                        body += f"\n\n```suggestion\n{suggested_fix}\n```"
+
                     all_inline_comments.append({
                         'path': file['filename'],
                         'position': position_map[line_num],
-                        'body': f"{prefix}{comment['body']}",
+                        'body': body,
                     })
 
             if review.get('summary'):

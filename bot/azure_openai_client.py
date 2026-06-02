@@ -72,7 +72,7 @@ class AzureOpenAIClient:
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.3,
-                max_completion_tokens=2000,
+                max_completion_tokens=3000,
             )
             
             return response.choices[0].message.content
@@ -108,7 +108,7 @@ class AzureOpenAIClient:
                     {"role": "user", "content": user_prompt},
                 ],
                 temperature=0.3,
-                max_completion_tokens=2000,
+                max_completion_tokens=3000,
             )
 
             raw_text = response.choices[0].message.content
@@ -149,11 +149,16 @@ class AzureOpenAIClient:
             valid_comments = []
             for c in parsed["comments"]:
                 if isinstance(c, dict) and "line" in c and "body" in c:
-                    valid_comments.append({
+                    comment_data = {
                         "line": int(c["line"]),
                         "body": str(c["body"]),
                         "severity": c.get("severity", "suggestion"),
-                    })
+                    }
+                    if c.get("suggested_fix") and isinstance(c["suggested_fix"], str) and c["suggested_fix"].strip():
+                        fix_text = c["suggested_fix"]
+                        if "\n" not in fix_text:  # single-line only
+                            comment_data["suggested_fix"] = fix_text
+                    valid_comments.append(comment_data)
             parsed["comments"] = valid_comments
 
             return parsed
@@ -176,7 +181,8 @@ Use this exact schema:
     {
       "line": <new-file line number from the diff>,
       "body": "Your feedback for this specific line.",
-      "severity": "issue|suggestion|nitpick|praise"
+      "severity": "issue|suggestion|nitpick|praise",
+      "suggested_fix": "replacement code for the entire line (optional)"
     }
   ]
 }
@@ -192,6 +198,13 @@ Severity meanings:
 - "suggestion": Improvement that would make the code better
 - "nitpick": Minor style or convention preference
 - "praise": Something done well worth calling out
+
+Rules for "suggested_fix":
+- OPTIONAL — only include when you have a concrete code replacement for the line
+- Must contain the full replacement for the ENTIRE line, with proper indentation preserved
+- Single line only — do NOT include newlines
+- Do NOT include for "praise" or "nitpick" severity
+- Do NOT wrap in backticks — provide the raw code string
 
 Keep comments concise and actionable. Aim for 1-5 inline comments per file.
 If the changes look good with no issues, return an empty comments array and a positive summary."""

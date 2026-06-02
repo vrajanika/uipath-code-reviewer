@@ -1,0 +1,68 @@
+## Code Review
+
+Reviewed 9 file(s). See inline comments for details.
+
+**`bot/azure_openai_client.py`** (+157 -1)
+> The changes introduce a new method for structured code review responses, including robust parsing and prompt construction for different file types. The implementation is clear and modular, enhancing the client's functionality for automated code reviews.
+
+**`bot/diff_parser.py`** (+125 -0)
+> This file introduces a utility for parsing unified diff patches and mapping new-file line numbers to GitHub diff positions, with clear structure and well-documented code. The implementation is robust and covers edge cases such as hunk headers and special lines. Overall, the code is clean and well-organized.
+
+**`bot/github_client.py`** (+75 -0)
+> The new post_inline_review method adds the ability to post line-level review comments on pull requests, with a robust fallback to posting as an issue comment if permissions are insufficient. The implementation is clear and handles error cases gracefully.
+
+**`bot/main.py`** (+22 -1)
+> The changes add UTF-8 output handling for Windows, introduce a new CLI argument to control inline comments, and improve output file encoding and formatting. These updates enhance usability and compatibility.
+
+**`bot/reviewer.py`** (+191 -34)
+> This refactor introduces structured AI review output and inline GitHub comments, improving granularity and clarity. The code is well-organized, with clear separation between legacy and new review modes, and robust error handling.
+
+**`tests/test_azure_openai_client.py`** (+79 -0)
+> The new tests comprehensively cover structured code review responses, including JSON parsing, fallback behavior, and edge cases, significantly improving test coverage for AzureOpenAIClient.
+
+**`tests/test_diff_parser.py`** (+165 -0)
+> This test file provides comprehensive coverage for the diff position mapping utilities, including edge cases and multiple hunk scenarios. The tests are well-structured, clear, and validate both parsing and mapping logic effectively.
+
+**`tests/test_github_client.py`** (+66 -0)
+> The new tests comprehensively cover the post_inline_review method, including success, empty comments, and 403 fallback scenarios. The mocking is thorough and the assertions are clear.
+
+**`tests/test_reviewer.py`** (+143 -0)
+> The new tests comprehensively cover structured and inline review modes, including edge cases such as invalid line comments and legacy compatibility. The test coverage is thorough and well-structured.
+
+*Review powered by Azure OpenAI*
+
+---
+
+## Inline Comments
+
+- **bot/azure_openai_client.py** (pos 11): 👍 **PRAISE**: The new 'review_code_structured' method adds structured output and error handling, improving usability for downstream consumers.
+- **bot/azure_openai_client.py** (pos 40): 👍 **PRAISE**: The '_parse_ai_response' method defensively handles markdown code fences and malformed JSON, which is important for reliability.
+- **bot/azure_openai_client.py** (pos 79): 👍 **PRAISE**: The system prompt is tailored for specific file types, increasing review relevance for UiPath workflows and configs.
+- **bot/azure_openai_client.py** (pos 102): 💡 **SUGGESTION**: Consider limiting the length of the diff in the user prompt to avoid exceeding token limits for very large diffs.
+- **bot/diff_parser.py** (pos 35): 💡 **SUGGESTION**: Consider using 'enumerate' when iterating over lines to avoid manually managing the position counter, which could simplify the logic and improve readability.
+- **bot/diff_parser.py** (pos 45): 🔍 **NITPICK**: The check for empty trailing lines is a bit cryptic; consider clarifying the intent with a comment or refactoring for readability.
+- **bot/diff_parser.py** (pos 67): 👍 **PRAISE**: Good job handling the special '\ No newline at end of file' case, which is often overlooked in diff parsing.
+- **bot/diff_parser.py** (pos 91): 👍 **PRAISE**: The docstring is clear and accurately describes the function's behavior and return value.
+- **bot/github_client.py** (pos 5): 💡 **SUGGESTION**: Consider adding type hints for the comments parameter (e.g., List[Dict[str, Any]]) for better clarity and static analysis.
+- **bot/github_client.py** (pos 18): 👍 **PRAISE**: Good use of fallback to issue comment when no inline comments are provided.
+- **bot/github_client.py** (pos 22): 💡 **SUGGESTION**: Fetching the latest commit by converting to a list may be inefficient for PRs with many commits. Consider using pr.get_commits().reversed[0] or similar if supported.
+- **bot/github_client.py** (pos 49): 👍 **PRAISE**: The fallback formatting is clear and user-friendly, making it easy to read inline comments when posted as a single issue comment.
+- **bot/main.py** (pos 4): 👍 **PRAISE**: Good job proactively handling UTF-8 output on Windows, which can prevent encoding issues.
+- **bot/main.py** (pos 17): 👍 **PRAISE**: Adding the '--no-inline' argument provides useful flexibility for users who prefer legacy comment mode.
+- **bot/main.py** (pos 25): 👍 **PRAISE**: Specifying 'encoding="utf-8"' when opening the output file is a good practice to ensure consistent character encoding.
+- **bot/main.py** (pos 28): 👍 **PRAISE**: Appending inline comments to the output file improves visibility and makes the review results more comprehensive.
+- **bot/reviewer.py** (pos 14): 👍 **PRAISE**: The addition of SEVERITY_EMOJI improves comment clarity by visually distinguishing feedback types.
+- **bot/reviewer.py** (pos 37): 👍 **PRAISE**: The new 'inline_comments' argument adds flexibility for review modes, which is a thoughtful improvement.
+- **bot/reviewer.py** (pos 68): 👍 **PRAISE**: The use of build_position_map ensures accurate mapping of AI feedback to GitHub diff positions, which is crucial for inline comments.
+- **bot/reviewer.py** (pos 110): 💡 **SUGGESTION**: Consider logging errors in addition to returning them in the response for easier debugging and monitoring.
+- **bot/reviewer.py** (pos 258): 💡 **SUGGESTION**: The new _review_file_structured method is well-structured and provides detailed error handling, but you may want to validate the structure of 'comments' returned from Azure to avoid malformed inline comments.
+- **tests/test_diff_parser.py** (pos 10): 👍 **PRAISE**: Great use of docstrings for both the test class and individual test cases, which improves readability and maintainability.
+- **tests/test_diff_parser.py** (pos 54): 👍 **PRAISE**: Good job checking that position counters continue across multiple hunks, which is a subtle but important detail.
+- **tests/test_diff_parser.py** (pos 80): 👍 **PRAISE**: Testing the handling of the '\ No newline at end of file' marker is a nice touch and covers a common edge case.
+- **tests/test_diff_parser.py** (pos 106): 👍 **PRAISE**: The test for deletions-only patches ensures that the parser handles missing new line numbers correctly, which is important for robustness.
+- **tests/test_diff_parser.py** (pos 139): 👍 **PRAISE**: Verifying that deleted lines are excluded from the position map is a good check for correctness.
+- **tests/test_reviewer.py** (pos 4): 👍 **PRAISE**: Mocking of azure_client and its return value is clear and ensures the test is isolated from external dependencies.
+- **tests/test_reviewer.py** (pos 17): 👍 **PRAISE**: The assertion checks both the review status and the inline comment structure, which is good for validating the integration.
+- **tests/test_reviewer.py** (pos 29): 👍 **PRAISE**: This test covers the full inline review workflow and validates the output structure, which is important for regression prevention.
+- **tests/test_reviewer.py** (pos 53): 👍 **PRAISE**: Testing the skipping of invalid line references is a useful edge case and ensures robustness of the inline comment filtering logic.
+- **tests/test_reviewer.py** (pos 76): 👍 **PRAISE**: The legacy mode test ensures backward compatibility, which is valuable for maintaining support for older review flows.
